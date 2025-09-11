@@ -1,0 +1,17 @@
+# Created by venv; see https://docs.python.org/3/library/venv.html
+Include/
+Lib/
+Scripts/
+pyvenv.cfg
+
+
+# Cache Files
+__pycache__/
+*.py[cod]
+*$py.class
+
+
+# Database
+*.sqlite3
+*.db
+*.db-journal

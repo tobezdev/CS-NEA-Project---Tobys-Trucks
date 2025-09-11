@@ -1,0 +1,13 @@
+.vscode/
+Include/
+Lib/
+Scripts/
+pyvenv.cfg
+
+src/assets/*
+
+.gitattributes
+.gitignore
+
+.prettierignore
+.prettierrc

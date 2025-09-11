@@ -1,0 +1,11 @@
+{
+    "files.associations": {
+        "*.py": "python"
+    },
+    "[python]": {
+        "editor.defaultFormatter": "ms-python.black-formatter",
+        "editor.formatOnSave": true,
+        "editor.formatOnSaveMode": "file"
+    },
+    "python.analysis.typeCheckingMode": "strict"
+}
