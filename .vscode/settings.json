@@ -2,10 +2,19 @@
     "files.associations": {
         "*.py": "python"
     },
+
     "[python]": {
         "editor.defaultFormatter": "ms-python.black-formatter",
         "editor.formatOnSave": true,
         "editor.formatOnSaveMode": "file"
     },
-    "python.analysis.typeCheckingMode": "standard"
+    "python.analysis.typeCheckingMode": "standard",
+
+    "editor.cursorStyle": "line",
+    "editor.cursorBlinking": "expand",
+    "editor.cursorSmoothCaretAnimation": "on",
+    "editor.cursorHeight": 20,
+    "editor.cursorWidth": 2,
+
+    "sqlite3-editor.ui.columnFilter.list.maxTableRecords": 200000
 }
