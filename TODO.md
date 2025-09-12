@@ -1,7 +1,7 @@
 # To Do List
 
 [ ] Add validation to database entries:
-    [ ] SetupTruckForm - Line 351 (main.py)
-    [ ] SetupSupplierForm - Line 520 (main.py)
-    [ ] SetupCustomerForm - Line 673 (main.py)
-    [ ] 
+    [ ] setUpTruckForm - Line 351 (main.py)
+    [ ] setUpSupplierForm - Line 520 (main.py)
+    [ ] setUpCustomerForm - Line 673 (main.py)
+    [ ] setUpOrderForm - Line 825 (main.py)
