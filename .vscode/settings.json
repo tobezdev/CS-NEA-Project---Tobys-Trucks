@@ -7,5 +7,5 @@
         "editor.formatOnSave": true,
         "editor.formatOnSaveMode": "file"
     },
-    "python.analysis.typeCheckingMode": "strict"
+    "python.analysis.typeCheckingMode": "standard"
 }
