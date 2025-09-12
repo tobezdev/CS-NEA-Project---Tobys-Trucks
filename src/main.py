@@ -212,7 +212,7 @@ def clearMainWindow():
     setUpMainWindow()
 
 #==========================================================================================================
-############ BIKE TABLE ############
+############ TRUCKS TABLE ############
 
 def listTrucks():
     clearMainWindow()
@@ -687,7 +687,7 @@ def setUpCustomerForm(heading):
 def selectCustomerToDelete():
     clearMainWindow()
 
-    mainWindow.title("BOSTON BIKES - DELETE A SUPPLIER")
+    mainWindow.title("TOBY'S TRUCKS - DELETE A SUPPLIER")
 
     customerIDFrame = Frame(mainWindow, bg="Light blue", highlightbackground="blue", highlightthickness=2)
     customerIDFrame.place(x=50, y=10, width=280, height=280)
@@ -1315,7 +1315,7 @@ def profitReport(event):
     listReport.insert( END, " =====================================================================")
 
 #----------------------------------------------------------------------------------------------------------
-########  BIKES IN STOCK REPORT  #######
+########  TRUCKS IN STOCK REPORT  #######
 
 def trucksInStock():
     clearMainWindow()
