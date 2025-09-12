@@ -21,201 +21,157 @@ Toby Smith
 import sqlite3                      # SQL Commands
 from os.path import isfile          # We need this to check if the database exists
 from datetime import date           # We need this for todays date and finding the year
-from tkinter import *               # Tkinter
-from tkinter import messagebox      # Tkinter Message Box
-from tkinter import ttk             # We need this for the Tkinter Combo Box (Drop Down List Box)
+from tkinter import Tk, PhotoImage, StringVar, Menu, Listbox, Button, Label, Entry, Frame, ttk, messagebox, Canvas, END, LEFT
 
 #----------------------------------------------------------------------------------------------------------
-
 #### DATABASE SETUP ####
 
-# DATABASE - If the database exists in the same folder as the program it will be opened.
-#            If it does not exist it will be created with an tables.
+tobysTrucksDatabase = sqlite3.connect("data.db")
 
-databaseExists = isfile("BOSTON BIKES DATABASE.db")   # databaseExist - Boolean Variable - True or False  
+try:
+    tobysTrucksDatabase.execute("""
+        CREATE TABLE IF NOT EXISTS truckTable (
+            truckID TEXT PRIMARY KEY,
+            make TEXT,
+            model TEXT,
+            size TEXT,
+            truckSupplierID TEXT,
+            buyingPrice FLOAT,
+            sellingPrice FLOAT,
+            stockLevel INTEGER,
+            reorderLevel INTEGER,
+            reorderAmount INTEGER
+        )
+    """)
+    tobysTrucksDatabase.execute("""
+        CREATE TABLE IF NOT EXISTS supplierTable (
+            supplierID TEXT PRIMARY KEY,
+            supplierName TEXT,
+            supplierAddress TEXT,
+            supplierPhone TEXT,
+            supplierEmail TEXT
+        )
+    """)
+    tobysTrucksDatabase.execute("""
+        CREATE TABLE IF NOT EXISTS customerTable (
+            customerID TEXT PRIMARY KEY,
+            customerName TEXT,
+            customerAddress TEXT,
+            customerPhone TEXT,
+            customerEmail TEXT
+        )
+    """)
+    tobysTrucksDatabase.execute("""
+        CREATE TABLE IF NOT EXISTS orderTable (
+            orderID TEXT PRIMARY KEY,
+            orderCustomerID TEXT,
+            orderDate TEXT,
+            paid TEXT
+        )
+    """)
+    tobysTrucksDatabase.execute("""
+        CREATE TABLE IF NOT EXISTS orderItemsTable (
+            orderItemsOrderID TEXT,
+            orderItemsTruckID TEXT,
+            quantity INTEGER
+        )
+    """)
+    tobysTrucksDatabase.commit()
 
-# OPEN OR CREATE THE DATABASE - AS A GLOBAL    
-bostonBikesDatabase = sqlite3.connect("BOSTON BIKES DATABASE.db")
-
-# IF THIS IS A NEW DATABASE - CREATE THE TABLES        
-if not databaseExists:
-
-    print("The database 'BOSTON BIKES DATABASE.db' did not exist. It has been created.")
-
-    sqlCommand = ( "CREATE TABLE bikeTable("      # FILED FORMAT / VALIDATION #
-                   "bikeID TEXT PRIMARY KEY,"     # XX99 Unique
-                   "make TEXT,"                   # Max 8 Characters
-                   "model TEXT,"                  # Max 8 Characters
-                   "size TEXT,"                   # XS,S,M,L,XL,XXL
-                   "bikeSupplierID TEXT,"         # Supplier ID from Supplier table
-                   "buyingPrice FLOAT,"           # Max £9999.99
-                   "sellingPrice FLOAT,"          # Max £9999.99
-                   "stockLevel INTEGER,"          # 0-100
-                   "reorderLevel INTEGER,"        # 0-100
-                   "reorderAmount INTEGER)" )     # 0-100
-
-    bostonBikesDatabase.execute(sqlCommand)
-    bostonBikesDatabase.commit()
-
-    sqlCommand = ( "CREATE TABLE supplierTable("  
-                   "supplierID TEXT PRIMARY KEY," # XXXXXXXX (8 Characters) Unique
-                   "supplierName TEXT,"           # Max 14 Characters
-                   "supplierAddress TEXT,"        # Max 14 Characters
-                   "supplierPhone TEXT,"          # 11 Digits
-                   "supplierEmail TEXT)" )        # Max 14 Characters
-   
-    bostonBikesDatabase.execute(sqlCommand)
-    bostonBikesDatabase.commit()  
-
-    sqlCommand = ( "CREATE TABLE customerTable("
-                   "customerID TEXT PRIMARY KEY," # 4 Digits
-                   "customerName TEXT,"           # Max 14 Characters
-                   "customerAddress TEXT,"        # Max 14 Characters
-                   "customerPhone TEXT,"          # 11 Digits
-                   "customerEmail TEXT)" )        # Max 14 Characters
-
-    bostonBikesDatabase.execute(sqlCommand)
-    bostonBikesDatabase.commit()
-
-    sqlCommand = ( "CREATE TABLE orderTable("
-                   "orderID TEXT PRIMARY KEY,"    # Format - X999
-                   "orderCustomerID TEXT,"        # Customer ID from Customer Table
-                   "orderDate TEXT,"              # Valid Date dd/mm/yyyy
-                   "paid TEXT)" )                 # Y or N  
-   
-    bostonBikesDatabase.execute(sqlCommand)
-    bostonBikesDatabase.commit()  
-
-    sqlCommand = ( "CREATE TABLE orderItemsTable("
-                   "orderItemsOrderID TEXT,"      # Order ID from Order Table ## COMBINED ##
-                   "orderItemsBikeID TEXT,"       # Bike ID from Bike Table   ##   KEY    ##
-                   "Quantity INTEGER)" )          # 1 - 100  Integer
-   
-    bostonBikesDatabase.execute(sqlCommand)
-    bostonBikesDatabase.commit()
+except sqlite3.Error as e:
+    print(f"Cannot setup database: {e}")
 
 #----------------------------------------------------------------------------------------------------------
-
 #### TKINTER SETUP ####
 
-windowMain = Tk()
+mainWindow = Tk()
+tobysTrucksPicture = PhotoImage(file="assets/tobys-trucks.png")
 
-bostonBikesPicture = PhotoImage(file = "BOSTON Bikes Picture.png")
-
-bikeID = StringVar()    # Tkinter Stringvar()s for Bike details
+truckID = StringVar()
 make = StringVar()
 model = StringVar()
 size = StringVar()
-bikeSupplierID = StringVar()
+truckSupplierID = StringVar()
 buyingPrice = StringVar()
 sellingPrice = StringVar()
 stockLevel = StringVar()
 reorderLevel = StringVar()
 reorderAmount = StringVar()
-
-supplierID = StringVar()    # Tkinter Stringvar()s for Supplier details
+supplierID = StringVar()
 supplierName = StringVar()
 supplierAddress = StringVar()
 supplierPhone = StringVar()
 supplierEmail = StringVar()
-
-customerID = StringVar()        # Tkinter Stringvar()s for Customer details
+customerID = StringVar()
 customerName = StringVar()
 customerAddress = StringVar()
 customerPhone = StringVar()
 customerEmail = StringVar()
-
-orderID = StringVar()           # Tkinter Stringvar()s for Order details
+orderID = StringVar()
 orderCustomerID = StringVar()
 orderDate = StringVar()
 paid = StringVar()
-
-orderItemsOrderID = StringVar()  # Tkinter Stringvar()s for Order Items details
-orderItemsBikeID = StringVar()
+orderItemsOrderID = StringVar()
+orderItemsTruckID = StringVar()
 quantity = StringVar()
-
-selectedBikeID = StringVar()     # Tkinter StringVar()s for Changing Key Fields
-selectedSupplierID = StringVar() 
+selectedTruckID = StringVar()
+selectedSupplierID = StringVar()
 selectedCustomerID = StringVar()
 selectedOrderID = StringVar()
-
 yearForProfitReport = StringVar()
 
 firstTime = True
 
-
-
-
-
-
-
-
-
-
-
-
 #==========================================================================================================
-
 #### THE MAIN FUNCTION ####
 
 def main():
-   
-    setUpWindowMain()
-
-    windowMain.mainloop()
+    setUpMainWindow()
+    mainWindow.mainloop()
 
 #----------------------------------------------------------------------------------------------------------
 
-def setUpWindowMain():
-
+def setUpMainWindow():
     global firstTime
- 
-    # Main Window - windowMain  
-    windowMain.geometry("870x525")
-    windowMain.title("BOSTON BIKES")
-    windowMain.resizable (True, True)
 
-    # Add a Menu Bar to windowMain - menuBar
-    menuBar = Menu(windowMain)
+    mainWindow.geometry("870x525")
+    mainWindow.title("TOBY\'S TRUCKS")
+    mainWindow.resizable (True, True)
 
-    # File Menu - menuFile
-    menuFile = Menu(menuBar, tearoff=0)
-    menuBar.add_cascade(label="File", menu = menuFile)
-    menuFile.add_command(label="Exit", command = exitProgram)
+    menuBar = Menu(mainWindow)
 
-    # Bike Menu - menuBikes
-    menuBikes = Menu(menuBar, tearoff=0)
-    menuBar.add_cascade(label="Bikes", menu = menuBikes)
-    menuBikes.add_command(label="List Bikes", command = listBikes)
-    menuBikes.add_command(label="Add a New Bike", command = addBike)
-    menuBikes.add_command(label="Edit a Bike", command = listBikes)
-    menuBikes.add_command(label="Delete a Bike", command = selectBikeToDelete)
-       
-    # Supplier Menu - menuSuppliers
-    menuSuppliers = Menu(menuBar, tearoff=0)
-    menuBar.add_cascade(label="Suppliers", menu = menuSuppliers)
-    menuSuppliers.add_command(label="List Suppliers", command = listSuppliers)
-    menuSuppliers.add_command(label="Add a New Supplier", command = addSupplier)
-    menuSuppliers.add_command(label="Edit a Supplier", command = listSuppliers)
-    menuSuppliers.add_command(label="Delete a Supplier", command = selectSupplierToDelete)
+    fileMenu = Menu(menuBar, tearoff=0)
+    menuBar.add_cascade(label="File", menu = fileMenu)
+    fileMenu.add_command(label="Exit", command = exitProgram)
 
-    # Customer Menu - menuCustomers
-    menuCustomers = Menu(menuBar, tearoff=0)
-    menuBar.add_cascade(label="Customers", menu = menuCustomers)
-    menuCustomers.add_command(label="List Customers", command = listCustomers)
-    menuCustomers.add_command(label="Add a New Customer", command = addCustomer)
-    menuCustomers.add_command(label="Edit a Customer", command = listCustomers)
-    menuCustomers.add_command(label="Delete a Customer", command = selectCustomerToDelete)
+    trucksMenu = Menu(menuBar, tearoff=0)
+    menuBar.add_cascade(label="Trucks", menu = trucksMenu)
+    trucksMenu.add_command(label="List Trucks", command = listTrucks)
+    trucksMenu.add_command(label="Add a New Truck", command = addTruck)
+    trucksMenu.add_command(label="Edit a Truck", command = listTrucks)
+    trucksMenu.add_command(label="Delete a Truck", command = selectTruckToDelete)
 
-    # Order Menu - menuOrders
-    menuOrders = Menu(menuBar, tearoff=0)
-    menuBar.add_cascade(label="Orders", menu = menuOrders)
-    menuOrders.add_command(label="List Orders", command = listOrders)
-    menuOrders.add_command(label="Add a New Order", command = addOrder)
-    menuOrders.add_command(label="Edit an Order", command = listOrders)
-    menuOrders.add_command(label="Delete an Order", command = selectOrderToDelete)
+    suppliersMenu = Menu(menuBar, tearoff=0)
+    menuBar.add_cascade(label="Suppliers", menu = suppliersMenu)
+    suppliersMenu.add_command(label="List Suppliers", command = listSuppliers)
+    suppliersMenu.add_command(label="Add a New Supplier", command = addSupplier)
+    suppliersMenu.add_command(label="Edit a Supplier", command = listSuppliers)
+    suppliersMenu.add_command(label="Delete a Supplier", command = selectSupplierToDelete)
 
-    # Order Items Menu - menuOrderitems
+    customersMenu = Menu(menuBar, tearoff=0)
+    menuBar.add_cascade(label="Customers", menu = customersMenu)
+    customersMenu.add_command(label="List Customers", command = listCustomers)
+    customersMenu.add_command(label="Add a New Customer", command = addCustomer)
+    customersMenu.add_command(label="Edit a Customer", command = listCustomers)
+    customersMenu.add_command(label="Delete a Customer", command = selectCustomerToDelete)
+
+    ordersMenu = Menu(menuBar, tearoff=0)
+    menuBar.add_cascade(label="Orders", menu = ordersMenu)
+    ordersMenu.add_command(label="List Orders", command = listOrders)
+    ordersMenu.add_command(label="Add a New Order", command = addOrder)
+    ordersMenu.add_command(label="Edit an Order", command = listOrders)
+    ordersMenu.add_command(label="Delete an Order", command = selectOrderToDelete)
+
     menuOrderItems = Menu(menuBar, tearoff=0)
     menuBar.add_cascade(label="Order Items", menu = menuOrderItems)
     menuOrderItems.add_command(label="List Order Items", command = listOrderItems)
@@ -223,330 +179,263 @@ def setUpWindowMain():
     menuOrderItems.add_command(label="Edit an Order Item", command = listOrderItems)
     menuOrderItems.add_command(label="Delete an Order Item", command = selectOrderItemToDelete)
 
-   # Reports Menu - menuReports
-    menuReports = Menu(menuBar, tearoff=0)
-    menuBar.add_cascade(label="Reports", menu = menuReports)
-    menuReports.add_command(label="Reorder Notes", command = selectSupplierForOrderNotes)
-    menuReports.add_command(label="Receipts", command = selectOrderForReceipt)
-    menuReports.add_command(label="Profit Report", command = selectYearForProfitReport)
-    menuReports.add_command(label="Bikes In Stock", command = bikesInStock)
-   
-    # Configure the Window with the Menu Bar
-    windowMain.config(menu=menuBar)
-   
-    # Add the Window Icon - Popcorn Icon File
-    windowMain.iconbitmap("Boston Bikes Icon.ico")
-   
-    # Create canvas for the Picture and Add Picture first time window opens
+    reportsMenu = Menu(menuBar, tearoff=0)
+    menuBar.add_cascade(label="Reports", menu = reportsMenu)
+    reportsMenu.add_command(label="Reorder Notes", command = selectSupplierForOrderNotes)
+    reportsMenu.add_command(label="Receipts", command = selectOrderForReceipt)
+    reportsMenu.add_command(label="Profit Report", command = selectYearForProfitReport)
+    reportsMenu.add_command(label="Trucks In Stock", command = trucksInStock)
+
+    mainWindow.config(menu=menuBar)
+    mainWindow.iconbitmap("assets/tobys-trucks.ico")
+
     if firstTime == True:    
-        canvasPicture = Canvas( windowMain, width=1000, height=500)
+        canvasPicture = Canvas( mainWindow, width=1000, height=500)
         canvasPicture.place( x=65, y=5)
-        canvasPicture.create_image(370, 240, image = bostonBikesPicture)
+        canvasPicture.create_image(370, 240, image = tobysTrucksPicture)
 
     firstTime = False
-   
+
 #----------------------------------------------------------------------------------------------------------
 
 def exitProgram():
-
-    answer = messagebox.askyesno("EXIT PROGRAM", "Are You Sure?")
+    answer = messagebox.askyesno("EXIT PROGRAM", "Are you sure you want to exit? Any unsaved data will be lost.")
 
     if answer == True:
-        windowMain.destroy()
-       
+        mainWindow.destroy()
+
 #----------------------------------------------------------------------------------------------------------
 
-def clearWindowMain():
-     
-    for widgets in windowMain.winfo_children():
+def clearMainWindow():
+    for widgets in mainWindow.winfo_children():
         widgets.destroy()
 
-    setUpWindowMain()
-
-
+    setUpMainWindow()
 
 #==========================================================================================================
-
 ############ BIKE TABLE ############
-   
-#==========================================================================================================
 
-def listBikes():
+def listTrucks():
+    clearMainWindow()
 
-    clearWindowMain()
-   
-    # Set Title
-    windowMain.title("BOSTON Bikes - Bike List")
+    mainWindow.title("Toby's Trucks - Truck List")
 
-    # Place the Listbox to contain the Bike List
-    listBikes = Listbox(windowMain, width=80, height=20, font=("Consolas",14), selectmode="single")
-    listBikes.place( x=30, y=15)
-    listBikes.config( bg="Light blue", highlightbackground="blue", highlightthickness=2)
+    listTrucks = Listbox(mainWindow, width=80, height=20, font=("Consolas",14), selectmode="single")
+    listTrucks.place( x=30, y=15)
+    listTrucks.config( bg="Light blue", highlightbackground="blue", highlightthickness=2)
 
-    ## This line calls the function - editBike - when a bike is clicked in listBikes
-    listBikes.bind("<<ListboxSelect>>", editBike)
+    listTrucks.bind("<<ListboxSelect>>", editTruck)
 
-    # Add Column Headings to List Box
-    listBikes.insert(END, " ")
-    listBikes.insert(END, "              BOSTON BIKES - BIKE LIST")
-    listBikes.insert(END, "              ========================")
-    listBikes.insert(END, " ")
-    listBikes.insert(END, "  Click on a Bike in the list to edit that bike.")
-    listBikes.insert(END, " ")
-    listBikes.insert(END, " Bike Bike     Bike     Bike Bike      Buying   Selling  Stock Reorder ReOrder")
-    listBikes.insert(END, " ID   Make     Model    Size Supplier  Price    Price          Level   Amount")
-    listBikes.insert(END, " ---- -------- -------- ---- --------  -------  -------  ----- ------- -------")
-   
-    sqlCommand = "SELECT * FROM bikeTable"
+    listTrucks.insert(END, " ")
+    listTrucks.insert(END, "             TOBY'S TRUCKS - TRUCK LIST")
+    listTrucks.insert(END, "             ==========================")
+    listTrucks.insert(END, " ")
+    listTrucks.insert(END, "  Click on a Truck in the list to edit that truck.")
+    listTrucks.insert(END, " ")
+    listTrucks.insert(END, " Truck Truck     Truck     Truck Truck      Buying   Selling  Stock Reorder ReOrder")
+    listTrucks.insert(END, " ID   Make     Model    Size Supplier  Price    Price          Level   Amount")
+    listTrucks.insert(END, " ---- -------- -------- ---- --------  -------  -------  ----- ------- -------")
 
-    for row in bostonBikesDatabase.execute(sqlCommand):
-           
-        listBikes.insert( END, " %-4s %-8s %-8s %-4s %-8s %8.2f %8.2f %4d %6d %6d" %(row))
+    for row in tobysTrucksDatabase.execute("SELECT * FROM truckTable"):
+        listTrucks.insert( END, " %-4s %-8s %-8s %-4s %-8s %8.2f %8.2f %4d %6d %6d" %(row))
 
 #----------------------------------------------------------------------------------------------------------
 
-# EDIT A BIKE - SET UP THE EDIT WINDOW AND LOAD BIKE DETAILS IN
-
-def editBike(event):
-   
+def editTruck(event):
     listIndex = event.widget.curselection()[0] # Find index number of the item clicked in the list      
+    selectedTruckID.set( event.widget.get(listIndex)[1:5] ) # Find the clicked truckID
+    queryResults = tobysTrucksDatabase.execute(f"SELECT * FROM truckTable WHERE truckID = '{selectedTruckID.get()}'")
+    truckRecord = queryResults.fetchone()
 
-    selectedBikeID.set( event.widget.get(listIndex)[1:5] ) # Find the clicked bikeID
+    truckID.set(truckRecord[0])
+    make.set(truckRecord[1])
+    model.set(truckRecord[2])
+    size.set(truckRecord[3])
+    truckSupplierID.set(truckRecord[4])
+    buyingPrice.set("%-8.2f" %(truckRecord[5]))
+    sellingPrice.set("%-8.2f" %(truckRecord[6]))
+    stockLevel.set(truckRecord[7])
+    reorderLevel.set(truckRecord[8])
+    reorderAmount.set(truckRecord[9])
 
-    sqlCommand = "SELECT * from bikeTable WHERE bikeID = " + "'" + selectedBikeID.get() + "'"
-   
-    queryResults = bostonBikesDatabase.execute(sqlCommand)
-   
-    # Fetch one record from Query Results (should be only one result here anyway)    
-    bikeRecord = queryResults.fetchone()
-     
-    # Put Bike Data into the Tkinter String Vars
-    bikeID.set(bikeRecord[0])
-    make.set(bikeRecord[1])
-    model.set(bikeRecord[2])
-    size.set(bikeRecord[3])
-    bikeSupplierID.set(bikeRecord[4])
-    buyingPrice.set("%-8.2f" %(bikeRecord[5]))
-    sellingPrice.set("%-8.2f" %(bikeRecord[6]))
-    stockLevel.set(bikeRecord[7])
-    reorderLevel.set(bikeRecord[8])
-    reorderAmount.set(bikeRecord[9])
+    setUpTruckForm("Edit Truck")
 
-    setUpBikeForm("Edit Bike")
-
-    # Place the Update button
-    buttonUpdateBike = Button( windowMain, text="Update Bike Details", command = updateBikeDetails)
-    buttonUpdateBike.place( x=350, y=320, width=200, height=30 )
-
+    updateTruckButton = Button(mainWindow, text="Update Truck Details", command=updateTruckDetails)
+    updateTruckButton.place(x=350, y=320, width=200, height=30)
 
 #----------------------------------------------------------------------------------------------------------
 
-def updateBikeDetails():
+def updateTruckDetails():
+    tobysTrucksDatabase.execute(f"""
+        UPDATE truckTable
+        SET 
+            truckID = {truckID.get()},
+            make = {make.get()},
+            model = {model.get()},
+            size = {size.get()},
+            truckSupplierID = {truckSupplierID.get()},
+            buyingPrice = {buyingPrice.get()},
+            sellingPrice = {sellingPrice.get()},
+            stockLevel = {stockLevel.get()},
+            reorderLevel = {reorderLevel.get()},
+            reorderAmount = {reorderAmount.get()}
+        WHERE 
+            truckID = {selectedTruckID.get()}
+    """)
+    tobysTrucksDatabase.commit()
 
-    sqlCommand = ( "UPDATE bikeTable "
-                   "SET bikeID = '"     + bikeID.get()         + "', "
-                   "make = '"           + make.get()           + "', "
-                   "model = '"          + model.get()          + "', "
-                   "size = '"           + size.get()           + "', "
-                   "bikeSupplierID = '" + bikeSupplierID.get() + "', "
-                   "buyingPrice = '"    + buyingPrice.get()    + "', "
-                   "sellingPrice = '"   + sellingPrice.get()   + "', "
-                   "stockLevel = '"     + stockLevel.get()     + "', "
-                   "reorderLevel = '"   + reorderLevel.get()   + "', "
-                   "reorderAmount = '"  + reorderAmount.get()  + "'  "    
-                   "WHERE bikeID = '"   + selectedBikeID.get() + "'  " )
-
-    bostonBikesDatabase.execute(sqlCommand)
-    bostonBikesDatabase.commit()
-
-    labelMessage = Label( windowMain, font="11", bg="Light blue", text = "Bike Details Updated")
-    labelMessage.place( x=345, y=360)
+    labelMessage = Label(mainWindow, font="11", bg="Light blue", text="Truck Details Updated")
+    labelMessage.place(x=345, y=360)
 
 #----------------------------------------------------------------------------------------------------------
 
-def addBike():
-
-    # Empty the Tkinter String Variables
-    bikeID.set("")
+def addTruck():
+    truckID.set("")
     make.set("")
     model.set("")
     size.set("")
-    bikeSupplierID.set("")
+    truckSupplierID.set("")
     buyingPrice.set("")
     sellingPrice.set("")
     stockLevel.set("")
     reorderLevel.set("")
     reorderAmount.set("")
 
-    setUpBikeForm("Add Bike")
+    setUpTruckForm("Add Truck")
 
-    # Place the Save button
-    buttonSaveBike = Button( windowMain, text="Save Bike Details", command = saveNewBike)
-    buttonSaveBike.place( x=350, y=320, width=200, height=30 )
+    buttonSaveTruck = Button(mainWindow, text="Save Truck Details", command=saveNewTruck)
+    buttonSaveTruck.place(x=350, y=320, width=200, height=30)
 
 #----------------------------------------------------------------------------------------------------------
 
-def saveNewBike():
+def saveNewTruck():
+    newTruckRecord = [
+        truckID.get(), make.get(), model.get(), size.get(),
+        truckSupplierID.get(), buyingPrice.get(), sellingPrice.get(),
+        stockLevel.get(), reorderLevel.get(), reorderAmount.get()
+    ]
 
-    newBikeRecord = [bikeID.get(), make.get(), model.get(), size.get(),\
-                     bikeSupplierID.get(), buyingPrice.get(), sellingPrice.get(),\
-                     stockLevel.get(), reorderLevel.get(), reorderAmount.get()]
+    tobysTrucksDatabase.execute("INSERT INTO truckTable VALUES (?,?,?,?,?,?,?,?,?,?)", newTruckRecord)
+    tobysTrucksDatabase.commit()
 
-    bostonBikesDatabase.execute("INSERT INTO bikeTable VALUES(?,?,?,?,?,?,?,?,?,?)",newBikeRecord)
-    bostonBikesDatabase.commit()
-   
-    labelMessage = Label( windowMain, font="11", bg="Light blue", text = "New Bike Saved")
-    labelMessage.place( x=350, y=360)
-   
+    messageLabel = Label(mainWindow, font="11", bg="Light blue", text="New Truck Saved")
+    messageLabel.place(x=350, y=360)
+
 #----------------------------------------------------------------------------------------------------------
 
-def setUpBikeForm(heading):
-   
-    clearWindowMain()
-   
-    # Place a frame to surround heading,labels and user entries    
-    frameEditbike = Frame(windowMain, bg="Light blue", highlightbackground="red", highlightthickness=2)
-    frameEditbike.place( x=200, y=10, width = 580, height = 400)
+def setUpTruckForm(heading):
+    clearMainWindow()
 
-    # Place the heading  
-    labelHeading = Label(windowMain, text=heading, font=('Arial', 16), bg="Light blue")
+    frameEdittruck = Frame(mainWindow, bg="Light blue", highlightbackground="red", highlightthickness=2)
+    frameEdittruck.place( x=200, y=10, width = 580, height = 400)
+
+    labelHeading = Label(mainWindow, text=heading, font=('Arial', 16), bg="Light blue")
     labelHeading.place( x=320, y=12, width=200, height=30)
-   
-    # Place the Labels
-    Label( windowMain, bg="Light blue", text = "Bike ID:"          ).place( x=220, y=60)
-    Label( windowMain, bg="Light blue", text = "Make:"             ).place( x=220, y=85)
-    Label( windowMain, bg="Light blue", text = "Model:"            ).place( x=220, y=110)
-    Label( windowMain, bg="Light blue", text = "Size:"             ).place( x=220, y=135)
-    Label( windowMain, bg="Light blue", text = "Bike Supplier ID:" ).place( x=220, y=160)
-    Label( windowMain, bg="Light blue", text = "Buy Price:"        ).place( x=220, y=185)
-    Label( windowMain, bg="Light blue", text = "Sell Price:"       ).place( x=220, y=210)
-    Label( windowMain, bg="Light blue", text = "Stock:"            ).place( x=220, y=235)
-    Label( windowMain, bg="Light blue", text = "Reorder Level:"    ).place( x=220, y=260)
-    Label( windowMain, bg="Light blue", text = "Reorder Amount:"   ).place( x=220, y=285)
+
+    Label(mainWindow, bg="Light blue", text="Truck ID:").place(x=220, y=60)
+    Label(mainWindow, bg="Light blue", text="Make:").place(x=220, y=85)
+    Label(mainWindow, bg="Light blue", text="Model:").place(x=220, y=110)
+    Label(mainWindow, bg="Light blue", text="Size:").place(x=220, y=135)
+    Label(mainWindow, bg="Light blue", text="Truck Supplier ID:").place(x=220, y=160)
+    Label(mainWindow, bg="Light blue", text="Buy Price:").place(x=220, y=185)
+    Label(mainWindow, bg="Light blue", text="Sell Price:").place(x=220, y=210)
+    Label(mainWindow, bg="Light blue", text="Stock:").place(x=220, y=235)
+    Label(mainWindow, bg="Light blue", text="Reorder Level:").place(x=220, y=260)
+    Label(mainWindow, bg="Light blue", text="Reorder Amount:").place(x=220, y=285)
 
     # Place the Data Format Labels - Information for the user  (Validation - None Added Yet)
-    Label( windowMain, bg="Light blue", text = ": Format XX99"         ).place( x=570, y=60)
-    Label( windowMain, bg="Light blue", text = ": Max 8 Characters"    ).place( x=570, y=85)
-    Label( windowMain, bg="Light blue", text = ": Max 8 Characters"    ).place( x=570, y=110)
-    Label( windowMain, bg="Light blue", text = ": XS,S,M,L,XL,XXL"     ).place( x=570, y=135)
-    Label( windowMain, bg="Light blue", text = ": From Supplier Table" ).place( x=570, y=160)
-    Label( windowMain, bg="Light blue", text = ": Max £9999.99"        ).place( x=570, y=185)
-    Label( windowMain, bg="Light blue", text = ": Max £9999.99"        ).place( x=570, y=210)
-    Label( windowMain, bg="Light blue", text = ": 0-100"               ).place( x=570, y=235)
-    Label( windowMain, bg="Light blue", text = ": 0-100"               ).place( x=570, y=260)
-    Label( windowMain, bg="Light blue", text = ": 0-100"               ).place( x=570, y=285)
- 
-    # Place the Entry boxes
-    entry0 = Entry( windowMain, textvariable = bikeID,         width=30, bg="yellow").place( x=350, y=60)
-    entry1 = Entry( windowMain, textvariable = make,           width=30, bg="white") .place( x=350, y=85)
-    entry2 = Entry( windowMain, textvariable = model,          width=30, bg="white") .place( x=350, y=110)
-    entry3 = Entry( windowMain, textvariable = size,           width=30, bg="white") .place( x=350, y=135)
-    entry4 = Entry( windowMain, textvariable = bikeSupplierID, width=30, bg="white") .place( x=350, y=160)
-    entry5 = Entry( windowMain, textvariable = buyingPrice,    width=30, bg="white") .place( x=350, y=185)
-    entry6 = Entry( windowMain, textvariable = sellingPrice,   width=30, bg="white") .place( x=350, y=210)
-    entry7 = Entry( windowMain, textvariable = stockLevel,     width=30, bg="white") .place( x=350, y=235)
-    entry8 = Entry( windowMain, textvariable = reorderLevel,   width=30, bg="white") .place( x=350, y=260)
-    entry9 = Entry( windowMain, textvariable = reorderAmount,  width=30, bg="white") .place( x=350, y=285)
- 
+    Label(mainWindow, bg="Light blue", text=": Format XX99").place(x=570, y=60)
+    Label(mainWindow, bg="Light blue", text=": Max 8 Characters").place(x=570, y=85)
+    Label(mainWindow, bg="Light blue", text=": Max 8 Characters").place(x=570, y=110)
+    Label(mainWindow, bg="Light blue", text=": XS,S,M,L,XL,XXL").place(x=570, y=135)
+    Label(mainWindow, bg="Light blue", text=": From Supplier Table").place(x=570, y=160)
+    Label(mainWindow, bg="Light blue", text=": Max £9999.99").place(x=570, y=185)
+    Label(mainWindow, bg="Light blue", text=": Max £9999.99").place(x=570, y=210)
+    Label(mainWindow, bg="Light blue", text=": 0-100").place(x=570, y=235)
+    Label(mainWindow, bg="Light blue", text=": 0-100").place(x=570, y=260)
+    Label(mainWindow, bg="Light blue", text=": 0-100").place(x=570, y=285)
+
+    entry0 = Entry(mainWindow, textvariable=truckID, width=30, bg="yellow").place(x=350, y=60)
+    entry1 = Entry(mainWindow, textvariable=make, width=30, bg="white").place(x=350, y=85)
+    entry2 = Entry(mainWindow, textvariable=model, width=30, bg="white").place(x=350, y=110)
+    entry3 = Entry(mainWindow, textvariable=size, width=30, bg="white").place(x=350, y=135)
+    entry4 = Entry(mainWindow, textvariable=truckSupplierID, width=30, bg="white").place(x=350, y=160)
+    entry5 = Entry(mainWindow, textvariable=buyingPrice, width=30, bg="white").place(x=350, y=185)
+    entry6 = Entry(mainWindow, textvariable=sellingPrice, width=30, bg="white").place(x=350, y=210)
+    entry7 = Entry(mainWindow, textvariable=stockLevel, width=30, bg="white").place(x=350, y=235)
+    entry8 = Entry(mainWindow, textvariable=reorderLevel, width=30, bg="white").place(x=350, y=260)
+    entry9 = Entry(mainWindow, textvariable=reorderAmount, width=30, bg="white").place(x=350, y=285)
+
 #----------------------------------------------------------------------------------------------------------
 
-def selectBikeToDelete():
+def selectTruckToDelete():
+    clearMainWindow()
 
-    clearWindowMain()
+    mainWindow.title("TOBY'S TRUCKS - DELETE A TRUCK")
 
-    # Set Up the Edit bike Window - windowEditbike
-    windowMain.title("BOSTON BIKES - DELETE A BIKE")
-   
-    # Place a Frame to surround heading,labels and user entries    
-    frameEnterbikeID = Frame(windowMain, bg="Light blue", highlightbackground="blue", highlightthickness=2)
-    frameEnterbikeID.place( x=50, y=10, width = 280, height = 280)
-   
-    # Place the Heading
-    labelHeadingEnterbikeID = Label(windowMain, text="Select Bike ID", font=('Arial', 16), bg="Light blue")
-    labelHeadingEnterbikeID.place( x=70, y=12, width=200, height=40)
+    enterTruckIDFrame = Frame(mainWindow, bg="Light blue", highlightbackground="blue", highlightthickness=2)
+    enterTruckIDFrame.place(x=50, y=10, width=280, height=280)
 
-    # Place the Label
-    labelEnterbikeID = Label( windowMain, text = "Enter Bike ID:").place( x=70, y=60)
+    selectTruckIDHeadingLabel = Label(mainWindow, text="Select Truck ID", font=('Arial', 16), bg="Light blue")
+    selectTruckIDHeadingLabel.place(x=70, y=12, width=200, height=40)
 
-    # Place the Entry Box
-    entrySelectedbikeID = Entry( windowMain, textvariable = bikeID, width=20, bg="yellow")
-    entrySelectedbikeID.place( x=170, y=60)
-    entrySelectedbikeID.delete(0, END)
+    enterTruckIDLabel = Label(mainWindow, text="Enter Truck ID:")
+    enterTruckIDLabel.place(x=70, y=60)
 
-    # Place the Button Delete Bike
-    buttonDeleteBike = Button( windowMain, text = "Delete Bike", width=32, command = deleteBike)
-    buttonDeleteBike.place( x=70, y=100)
-   
+    entrySelectedTruckID = Entry(mainWindow, textvariable=truckID, width=20, bg="yellow")
+    entrySelectedTruckID.place(x=170, y=60)
+    entrySelectedTruckID.delete(0, END)
+
+    deleteTruckButton = Button(mainWindow, text="Delete Truck", width=32, command=deleteTruck)
+    deleteTruckButton.place(x=70, y=100)
+
 #----------------------------------------------------------------------------------------------------------
 
-def deleteBike():
+def deleteTruck():
+    tobysTrucksDatabase.execute(f"DELETE FROM truckTable WHERE truckID = '{truckID.get()}'")
+    tobysTrucksDatabase.commit()
 
-    sqlCommand = "DELETE FROM bikeTable WHERE bikeID = '" + bikeID.get() + "'"
+    frameMessage = Frame(mainWindow, bg="Light blue", highlightbackground="blue", highlightthickness=2)
+    frameMessage.place(x=90, y=160, width=200, height=100)
 
-    bostonBikesDatabase.execute(sqlCommand)
-    bostonBikesDatabase.commit()
-
-    # Place a frame to surround the message    
-    frameMessage = Frame(windowMain, bg="Light blue", highlightbackground="blue", highlightthickness=2)
-    frameMessage.place( x=90, y=160, width = 200, height = 100)
-   
-    # Place the Message
-    labelMessage = Label( windowMain, font="12", bg="Light blue", text = "Bike Deleted", justify = LEFT)
-    labelMessage.place( x=92, y=162)
+    labelMessage = Label(mainWindow, font="12", bg="Light blue", text="Truck Deleted", justify=LEFT)
+    labelMessage.place(x=92, y=162)
 
 #==========================================================================================================
-
 ############ SUPPLIER TABLE ############
-       
-#==========================================================================================================
 
 def listSuppliers():
+    clearMainWindow()
 
-    clearWindowMain()
-   
-    # Set Title
-    windowMain.title("BOSTON BIKES - SUPPLIER LIST")
+    mainWindow.title("TOBY'S TRUCKS - SUPPLIER LIST")
 
-    # Place the Listbox to contain the Supplier List
-    listSuppliers = Listbox(windowMain, width=80, height=20, font=("Consolas",14), selectmode="single")
-    listSuppliers.place( x=30, y=15)
-    listSuppliers.config( bg="Light blue", highlightbackground="blue", highlightthickness=2)
+    suppliersList = Listbox(mainWindow, width=80, height=20, font=("Consolas",14), selectmode="single")
+    suppliersList.place( x=30, y=15)
+    suppliersList.config(bg="Light blue", highlightbackground="blue", highlightthickness=2)
 
-    ## This line calls the function - supplierClickedInList - when a supplier is clicked in the list
-    listSuppliers.bind("<<ListboxSelect>>", editSupplier)
+    suppliersList.bind("<<ListboxSelect>>", editSupplier)
 
-    # Add Column Headings to List Box
-    listSuppliers.insert(END, " ")
-    listSuppliers.insert(END, "              BOSTON BIKES - SUPPLIER LIST")
-    listSuppliers.insert(END, "              ============================")
-    listSuppliers.insert(END, " ")
-    listSuppliers.insert(END, "  Click on a Supplier in the list to edit that Supplier.")
-    listSuppliers.insert(END, " ")
-    listSuppliers.insert(END, " ID       Supplier Name  Address        Phone        Email         ")
-    listSuppliers.insert(END, " -------- -------------- -------------- ------------ --------------")
-   
-    sqlCommand = "SELECT * FROM supplierTable"
+    suppliersList.insert(END, " ")
+    suppliersList.insert(END, "              TOBY'S TRUCKS - SUPPLIER LIST")
+    suppliersList.insert(END, "              =============================")
+    suppliersList.insert(END, " ")
+    suppliersList.insert(END, "  Click on a Supplier in the list to edit that Supplier.")
+    suppliersList.insert(END, " ")
+    suppliersList.insert(END, " ID       Supplier Name  Address        Phone        Email         ")
+    suppliersList.insert(END, " -------- -------------- -------------- ------------ --------------")
 
-    for row in bostonBikesDatabase.execute(sqlCommand):
-           
-        listSuppliers.insert(END, " %-8s %-14s %-14s %-12s %-14s" %(row))
+    for row in tobysTrucksDatabase.execute("SEELECT * FROM supplierTable"):
+        suppliersList.insert(END, " %-8s %-14s %-14s %-12s %-14s" %(row))
 
 #----------------------------------------------------------------------------------------------------------
 
 def editSupplier(event):
-     
-    listIndex = event.widget.curselection()[0] # Find index number of the item clicked in the list
+    listIndex = event.widget.curselection()[0]
+    selectedSupplierID.set(event.widget.get(listIndex)[1:9])
 
-    selectedSupplierID.set( event.widget.get(listIndex)[1:9] ) # Find clicked supplierID
-
-    sqlCommand = "SELECT * from supplierTable WHERE supplierID = " + "'" + selectedSupplierID.get() + "'"
-   
-    queryResults = bostonBikesDatabase.execute(sqlCommand)
-   
-    # Fetch one record from Query Results (should be only one result here anyway)    
+    queryResults = tobysTrucksDatabase.execute(f"SELECT * FROM supplierTable WHERE supplierID = '{selectedSupplierID.get()}'")
     supplierRecord = queryResults.fetchone()
-     
-    # Put Supplier Data into the Tkinter String Vars
+
     supplierID.set(supplierRecord[0])
     supplierName.set(supplierRecord[1])
     supplierAddress.set(supplierRecord[2])
@@ -554,34 +443,32 @@ def editSupplier(event):
     supplierEmail.set(supplierRecord[4])
 
     setUpSupplierForm("Edit Supplier")
-   
-    # Place the Update button
-    buttonSaveSupplier = Button( windowMain, text="Update Supplier Details", command = updateSupplierDetails)
-    buttonSaveSupplier.place( x=345, y=320, width=200, height=30 )
+
+    saveSupplierButton = Button(mainWindow, text="Update Supplier Details", command=updateSupplierDetails)
+    saveSupplierButton.place( x=345, y=320, width=200, height=30 )
 
 #----------------------------------------------------------------------------------------------------------
 
 def updateSupplierDetails():
+    tobysTrucksDatabase.execute(f"""
+        UPDATE supplierTable
+        SET
+            supplierID = '{supplierID.get()}',
+            supplierName = '{supplierName.get()}',
+            supplierAddress = '{supplierAddress.get()}',
+            supplierPhone = '{supplierPhone.get()}',
+            supplierEmail = '{supplierEmail.get()}'
+        WHERE
+            supplierID = '{selectedSupplierID.get()}'
+    """)
+    tobysTrucksDatabase.commit()
 
-    sqlCommand = ( "UPDATE supplierTable "
-                   "SET supplierID = '"   + supplierID.get() + "', "
-                   "supplierName = '"     + supplierName.get()    + "', "
-                   "supplierAddress = '"  + supplierAddress.get()    + "', "
-                   "supplierPhone = '"    + supplierPhone.get()      + "', "
-                   "supplierEmail = '"    + supplierEmail.get()      + "'  "
-                   "WHERE supplierID = '" + selectedSupplierID.get() + "'  " )
-
-    bostonBikesDatabase.execute(sqlCommand)
-    bostonBikesDatabase.commit()
-
-    labelMessage = Label( windowMain, font="11", bg="Light blue", text = "Supplier Updated")
-    labelMessage.place( x=345, y=360)
+    messageLabel = Label(mainWindow, font="11", bg="Light blue", text="Supplier Updated")
+    messageLabel.place(x=345, y=360)
 
 #----------------------------------------------------------------------------------------------------------
 
 def addSupplier():
-
-    # EMPTY THE ENTRY BOXES
     supplierID.set("")
     supplierName.set("")
     supplierAddress.set("")
@@ -590,161 +477,124 @@ def addSupplier():
 
     setUpSupplierForm("Add Supplier")
 
-    # Place the Save button
-    buttonSaveSupplier = Button( windowMain, text="Save Supplier Details", command = saveNewSupplier)
-    buttonSaveSupplier.place( x=350, y=320, width=200, height=30 )
+    saveSupplierButton = Button(mainWindow, text="Save Supplier Details", command=saveNewSupplier)
+    saveSupplierButton.place(x=350, y=320, width=200, height=30)
 
 #----------------------------------------------------------------------------------------------------------
 
 def saveNewSupplier():
+    newSupplierRecord = [
+        supplierID.get(), supplierName.get(), 
+        supplierAddress.get(), supplierPhone.get(), supplierEmail.get()
+    ]
 
-    newSupplierRecord = [supplierID.get(), supplierName.get(), supplierAddress.get(),\
-                         supplierPhone.get(), supplierEmail.get()]
+    tobysTrucksDatabase.execute("INSERT INTO supplierTable VALUES (?,?,?,?,?)", newSupplierRecord)
+    tobysTrucksDatabase.commit()
 
-    bostonBikesDatabase.execute("INSERT INTO supplierTable VALUES(?,?,?,?,?)",newSupplierRecord)
-    bostonBikesDatabase.commit()
-   
-    # Place the Message
-    labelMessage = Label( windowMain, font="11", bg="Light blue", text = "New Supplier Saved")
-    labelMessage.place( x=350, y=360)
-   
+    messageLabel = Label(mainWindow, font="11", bg="Light blue", text="New Supplier Saved")
+    messageLabel.place(x=350, y=360)
+
 #----------------------------------------------------------------------------------------------------------
 
 def setUpSupplierForm(heading):
 
-    clearWindowMain()
-   
-    # Place a frame to surround heading,labels and user entries    
-    frameEditSupplier = Frame(windowMain, bg="Light blue", highlightbackground="red", highlightthickness=2)
-    frameEditSupplier.place( x=200, y=10, width = 580, height = 400)
+    clearMainWindow()
 
-    # Place the heading  
-    labelHeadingAddSupplier = Label(windowMain, text=heading, font=('Arial', 16), bg="Light blue")
-    labelHeadingAddSupplier.place( x=320, y=12, width=200, height=30)
+    editSupplierFrame = Frame(mainWindow, bg="Light blue", highlightbackground="red", highlightthickness=2)
+    editSupplierFrame.place( x=200, y=10, width = 580, height = 400)
 
-    # Place the Labels
-    Label( windowMain, bg="Light blue", text = "Supplier ID:"   ).place( x=220, y=60)
-    Label( windowMain, bg="Light blue", text = "Supplier Name:" ).place( x=220, y=85)
-    Label( windowMain, bg="Light blue", text = "Address:"       ).place( x=220, y=110)
-    Label( windowMain, bg="Light blue", text = "Phone:"         ).place( x=220, y=135)
-    Label( windowMain, bg="Light blue", text = "Email"          ).place( x=220, y=160)
+    addSupplierHeadingLabel = Label(mainWindow, text=heading, font=('Arial', 16), bg="Light blue")
+    addSupplierHeadingLabel.place( x=320, y=12, width=200, height=30)
+
+    Label(mainWindow, bg="Light blue", text = "Supplier ID:").place( x=220, y=60)
+    Label(mainWindow, bg="Light blue", text = "Supplier Name:").place( x=220, y=85)
+    Label(mainWindow, bg="Light blue", text = "Address:").place( x=220, y=110)
+    Label(mainWindow, bg="Light blue", text = "Phone:").place( x=220, y=135)
+    Label(mainWindow, bg="Light blue", text = "Email:").place( x=220, y=160)
 
     # Place the Data Format Labels - Information for the user   (Validation - None Added Yet)
-    Label( windowMain, bg="Light blue", text = ": Format XXXXXXXX"   ).place( x=570, y=60)
-    Label( windowMain, bg="Light blue", text = ": Max 14 Characters" ).place( x=570, y=85)
-    Label( windowMain, bg="Light blue", text = ": Max 14 Characters" ).place( x=570, y=110)
-    Label( windowMain, bg="Light blue", text = ": 11 Digits"         ).place( x=570, y=135)
-    Label( windowMain, bg="Light blue", text = ": Max 14 Characters" ).place( x=570, y=160)
- 
-    # Place the Entry boxes
-    entry0 = Entry( windowMain, textvariable = supplierID,      width=30, bg="yellow").place( x=350, y=60)
-    entry1 = Entry( windowMain, textvariable = supplierName,    width=30, bg="white") .place( x=350, y=85)
-    entry2 = Entry( windowMain, textvariable = supplierAddress, width=30, bg="white") .place( x=350, y=110)
-    entry3 = Entry( windowMain, textvariable = supplierPhone,   width=30, bg="white") .place( x=350, y=135)
-    entry4 = Entry( windowMain, textvariable = supplierEmail,   width=30, bg="white") .place( x=350, y=160)
+    Label(mainWindow, bg="Light blue", text=": Format XXXXXXXX").place(x=570, y=60)
+    Label(mainWindow, bg="Light blue", text=": Max 14 Characters").place(x=570, y=85)
+    Label(mainWindow, bg="Light blue", text=": Max 14 Characters").place(x=570, y=110)
+    Label(mainWindow, bg="Light blue", text=": 11 Digits").place(x=570, y=135)
+    Label(mainWindow, bg="Light blue", text=": Max 14 Characters").place(x=570, y=160)
+
+    entry0 = Entry(mainWindow, textvariable=supplierID, width=30, bg="yellow").place(x=350, y=60)
+    entry1 = Entry(mainWindow, textvariable=supplierName, width=30, bg="white").place(x=350, y=85)
+    entry2 = Entry(mainWindow, textvariable=supplierAddress, width=30, bg="white").place(x=350, y=110)
+    entry3 = Entry(mainWindow, textvariable=supplierPhone, width=30, bg="white").place(x=350, y=135)
+    entry4 = Entry(mainWindow, textvariable=supplierEmail, width=30, bg="white").place(x=350, y=160)
 
 
 #----------------------------------------------------------------------------------------------------------
 
 def selectSupplierToDelete():
+    clearMainWindow()
 
-    clearWindowMain()
+    mainWindow.title("TOBY'S TRUCKS - DELETE A SUPPLIER")
 
-    # Set Up the Edit supplier Window - windowEditsupplier
-    windowMain.title("BOSTON BIKES - DELETE A SUPPLIER")
-   
-    # Place a Frame to surround heading,labels and user entries    
-    frameSupplierID = Frame(windowMain, bg="Light blue", highlightbackground="blue", highlightthickness=2)
-    frameSupplierID.place( x=50, y=10, width = 280, height = 280)
-   
-    # Place the Heading
-    labelHeading = Label(windowMain, text="Select Supplier ID", font=('Arial', 16), bg="Light blue")
-    labelHeading.place( x=70, y=12, width=200, height=40)
+    supplierIDFrame = Frame(mainWindow, bg="Light blue", highlightbackground="blue", highlightthickness=2)
+    supplierIDFrame.place(x=50, y=10, width=280, height=280)
 
-    # Place the Label
-    labelEnterSupplierID = Label( windowMain, text = "Enter Supplier ID:").place( x=70, y=60)
+    headingLabel = Label(mainWindow, text="Select Supplier ID", font=('Arial', 16), bg="Light blue")
+    headingLabel.place(x=70, y=12, width=200, height=40)
 
-    # Place the Entry Box
-    entrySelectedSupplierID = Entry( windowMain, textvariable = supplierID, width=20, bg="yellow")
-    entrySelectedSupplierID.place( x=170, y=60)
+    labelEnterSupplierID = Label(mainWindow, text="Enter Supplier ID:")
+    labelEnterSupplierID.place(x=70, y=60)
+
+    entrySelectedSupplierID = Entry(mainWindow, textvariable=supplierID, width=20, bg="yellow")
+    entrySelectedSupplierID.place(x=170, y=60)
     entrySelectedSupplierID.delete(0, END)
 
-    # Place the Button Delete Supplier
-    buttonDeleteSupplier = Button( windowMain, text="Delete Supplier", width=32, command = deleteSupplier)
+    buttonDeleteSupplier = Button( mainWindow, text="Delete Supplier", width=32, command = deleteSupplier)
     buttonDeleteSupplier.place( x=70, y=100)
-   
+
 #---------------------------------------------------------------------------------------
- 
+
 def deleteSupplier():
+    tobysTrucksDatabase.execute(f"DELETE FROM supplierTable WHERE supplierID = '{supplierID.get()}'")
+    tobysTrucksDatabase.commit()
 
-    sqlCommand = "DELETE FROM supplierTable WHERE supplierID = '" + supplierID.get() + "'"
+    messageFrame = Frame(mainWindow, bg="Light blue", highlightbackground="blue", highlightthickness=2)
+    messageFrame.place(x=90, y=160, width=200, height=100)
 
-    bostonBikesDatabase.execute(sqlCommand)
-    bostonBikesDatabase.commit()
-
-    # Place a frame to surround the message    
-    frameMessage = Frame(windowMain, bg="Light blue", highlightbackground="blue", highlightthickness=2)
-    frameMessage.place( x=90, y=160, width = 200, height = 100)
-   
-    # Place the Message
-    labelMessage = Label( windowMain, font="12", bg="Light blue", text = "Supplier Deleted", justify = LEFT)
-    labelMessage.place( x=92, y=162)
-
-#----------------------------------------------------------------------------------------------------------
+    messageLabel = Label(mainWindow, font="12", bg="Light blue", text="Supplier Deleted", justify=LEFT)
+    messageLabel.place( x=92, y=162)
 
 #==========================================================================================================
-
 ############ CUSTOMER TABLE ############
-       
-#==========================================================================================================
 
 def listCustomers():
+    clearMainWindow()
+    mainWindow.title("TOBY'S TRUCKS - CUSTOMER LIST")
 
-    clearWindowMain()
-   
-    # Set Title
-    windowMain.title("BOSTON BIKES - CUSTOMER LIST")
+    listCustomers = Listbox(mainWindow, width=80, height=20, font=("Consolas",14), selectmode="single")
+    listCustomers.place(x=30, y=15)
+    listCustomers.config(bg="Light blue", highlightbackground="blue", highlightthickness=2)
 
-    # Place the Listbox to contain the Customer List
-    listCustomers = Listbox(windowMain, width=80, height=20, font=("Consolas",14), selectmode="single")
-    listCustomers.place( x=30, y=15)
-    listCustomers.config( bg="Light blue", highlightbackground="blue", highlightthickness=2)
-
-    ## This line calls the function - customerClickedInList - when a customer is clicked in the list
     listCustomers.bind("<<ListboxSelect>>", editCustomer)
 
-    # Add Column Headings to List Box
     listCustomers.insert(END, " ")
-    listCustomers.insert(END, "              BOSTON BIKES - CUSTOMER LIST")
-    listCustomers.insert(END, "              ============================")
+    listCustomers.insert(END, "              TOBY'S TRUCKS - CUSTOMER LIST")
+    listCustomers.insert(END, "              =============================")
     listCustomers.insert(END, " ")
     listCustomers.insert(END, "  Click on a Customer in the list to edit that Customer.")
     listCustomers.insert(END, " ")
     listCustomers.insert(END, " ID   Customer Name  Address        Phone        Email         ")
     listCustomers.insert(END, " ---- -------------- -------------- ------------ --------------")
-   
-    sqlCommand = "SELECT * FROM customerTable"
 
-    for row in bostonBikesDatabase.execute(sqlCommand):
-           
+    for row in tobysTrucksDatabase.execute("SELECT * FROM customerTable"):
         listCustomers.insert(END, " %-4s %-14s %-14s %-12s %-14s" %(row))
 
 #----------------------------------------------------------------------------------------------------------
 
 def editCustomer(event):
-     
-    listIndex = event.widget.curselection()[0] # Find index number of the item clicked in the list
+    listIndex = event.widget.curselection()[0]
+    selectedCustomerID.set( event.widget.get(listIndex)[1:5])
 
-    selectedCustomerID.set( event.widget.get(listIndex)[1:5] ) # Find clicked customerID
-
-    sqlCommand = "SELECT * from customerTable WHERE customerID = " + "'" + selectedCustomerID.get() + "'"
-   
-    queryResults = bostonBikesDatabase.execute(sqlCommand)
-   
-    # Fetch one record from Query Results (should be only one result here anyway)    
+    queryResults = tobysTrucksDatabase.execute(f"SELECT * FROM customerTable WHERE customerID = '{selectedCustomerID.get()}'")
     customerRecord = queryResults.fetchone()
-     
-    # Put Customer Data into the Tkinter String Vars
+
     customerID.set(customerRecord[0])
     customerName.set(customerRecord[1])
     customerAddress.set(customerRecord[2])
@@ -752,10 +602,9 @@ def editCustomer(event):
     customerEmail.set(customerRecord[4])
 
     setUpCustomerForm("Edit Customer")
-   
-    # Place the Update button
-    buttonSaveCustomer = Button( windowMain, text="Update Customer Details", command = updateCustomerDetails)
-    buttonSaveCustomer.place( x=320, y=320, width=200, height=30 )
+
+    saveCustomerButton = Button(mainWindow, text="Update Customer Details", command=updateCustomerDetails)
+    saveCustomerButton.place(x=320, y=320, width=200, height=30)
 
 #----------------------------------------------------------------------------------------------------------
 
@@ -769,10 +618,10 @@ def updateCustomerDetails():
                    "customerEmail = '"    + customerEmail.get()   + "'  "
                    "WHERE customerID = '" + selectedCustomerID.get()      + "'  " )
 
-    bostonBikesDatabase.execute(sqlCommand)
-    bostonBikesDatabase.commit()
+    tobysTrucksDatabase.execute(sqlCommand)
+    tobysTrucksDatabase.commit()
 
-    labelMessage = Label( windowMain, font="11", bg="Light blue", text = "Customer Updated")
+    labelMessage = Label( mainWindow, font="11", bg="Light blue", text = "Customer Updated")
     labelMessage.place( x=345, y=360)
 
 #----------------------------------------------------------------------------------------------------------
@@ -789,7 +638,7 @@ def addCustomer():
     setUpCustomerForm("Add Customer")
 
     # Place the Save button
-    buttonSaveCustomer = Button( windowMain, text="Save Customer Details", command = saveNewCustomer)
+    buttonSaveCustomer = Button( mainWindow, text="Save Customer Details", command = saveNewCustomer)
     buttonSaveCustomer.place( x=320, y=320, width=200, height=30 )
 
 #----------------------------------------------------------------------------------------------------------
@@ -799,75 +648,75 @@ def saveNewCustomer():
     newCustomerRecord = [customerID.get(), customerName.get(), customerAddress.get(),\
                          customerPhone.get(), customerEmail.get()]
 
-    bostonBikesDatabase.execute("INSERT INTO customerTable VALUES(?,?,?,?,?)",newCustomerRecord)
-    bostonBikesDatabase.commit()
+    tobysTrucksDatabase.execute("INSERT INTO customerTable VALUES(?,?,?,?,?)",newCustomerRecord)
+    tobysTrucksDatabase.commit()
    
     # Place the Message
-    labelMessage = Label( windowMain, font="11", bg="Light blue", text = "New Customer Saved")
+    labelMessage = Label( mainWindow, font="11", bg="Light blue", text = "New Customer Saved")
     labelMessage.place( x=320, y=360)
    
 #----------------------------------------------------------------------------------------------------------
 
 def setUpCustomerForm(heading):
 
-    clearWindowMain()
+    clearMainWindow()
    
     # Place a frame to surround heading,labels and user entries    
-    frameEditCustomer = Frame(windowMain, bg="Light blue", highlightbackground="red", highlightthickness=2)
+    frameEditCustomer = Frame(mainWindow, bg="Light blue", highlightbackground="red", highlightthickness=2)
     frameEditCustomer.place( x=200, y=10, width = 580, height = 400)
 
     # Place the heading  
-    labelHeadingAddCustomer = Label(windowMain, text=heading, font=('Arial', 16), bg="Light blue")
+    labelHeadingAddCustomer = Label(mainWindow, text=heading, font=('Arial', 16), bg="Light blue")
     labelHeadingAddCustomer.place( x=320, y=12, width=200, height=30)
 
     # Place the Labels
-    Label( windowMain, bg="Light blue", text = "Customer ID:" ).place( x=220, y=60)
-    Label( windowMain, bg="Light blue", text = "Name:"        ).place( x=220, y=85)
-    Label( windowMain, bg="Light blue", text = "Address:"     ).place( x=220, y=110)
-    Label( windowMain, bg="Light blue", text = "Phone:"       ).place( x=220, y=135)
-    Label( windowMain, bg="Light blue", text = "Email"        ).place( x=220, y=160)
+    Label( mainWindow, bg="Light blue", text = "Customer ID:" ).place( x=220, y=60)
+    Label( mainWindow, bg="Light blue", text = "Name:"        ).place( x=220, y=85)
+    Label( mainWindow, bg="Light blue", text = "Address:"     ).place( x=220, y=110)
+    Label( mainWindow, bg="Light blue", text = "Phone:"       ).place( x=220, y=135)
+    Label( mainWindow, bg="Light blue", text = "Email"        ).place( x=220, y=160)
 
     # Place the Data Format Labels - Information for the user   (Validation - None Added Yet)
-    Label( windowMain, bg="Light blue", text = ": Format 9999"       ).place( x=570, y=60)
-    Label( windowMain, bg="Light blue", text = ": Max 14 Characters" ).place( x=570, y=85)
-    Label( windowMain, bg="Light blue", text = ": Max 14 Characters" ).place( x=570, y=110)
-    Label( windowMain, bg="Light blue", text = ": 11 Digits"         ).place( x=570, y=135)
-    Label( windowMain, bg="Light blue", text = ": Max 14 Characters" ).place( x=570, y=160)
+    Label( mainWindow, bg="Light blue", text = ": Format 9999"       ).place( x=570, y=60)
+    Label( mainWindow, bg="Light blue", text = ": Max 14 Characters" ).place( x=570, y=85)
+    Label( mainWindow, bg="Light blue", text = ": Max 14 Characters" ).place( x=570, y=110)
+    Label( mainWindow, bg="Light blue", text = ": 11 Digits"         ).place( x=570, y=135)
+    Label( mainWindow, bg="Light blue", text = ": Max 14 Characters" ).place( x=570, y=160)
 
     # Place the Entry boxes
-    entry0 = Entry( windowMain, textvariable = customerID,      width=30, bg="yellow").place( x=320, y=60)
-    entry1 = Entry( windowMain, textvariable = customerName,    width=30, bg="white") .place( x=320, y=85)
-    entry2 = Entry( windowMain, textvariable = customerAddress, width=30, bg="white") .place( x=320, y=110)
-    entry3 = Entry( windowMain, textvariable = customerPhone,   width=30, bg="white") .place( x=320, y=135)
-    entry4 = Entry( windowMain, textvariable = customerEmail,   width=30, bg="white") .place( x=320, y=160)
+    entry0 = Entry( mainWindow, textvariable = customerID,      width=30, bg="yellow").place( x=320, y=60)
+    entry1 = Entry( mainWindow, textvariable = customerName,    width=30, bg="white") .place( x=320, y=85)
+    entry2 = Entry( mainWindow, textvariable = customerAddress, width=30, bg="white") .place( x=320, y=110)
+    entry3 = Entry( mainWindow, textvariable = customerPhone,   width=30, bg="white") .place( x=320, y=135)
+    entry4 = Entry( mainWindow, textvariable = customerEmail,   width=30, bg="white") .place( x=320, y=160)
 
 #----------------------------------------------------------------------------------------------------------
 
 def selectCustomerToDelete():
 
-    clearWindowMain()
+    clearMainWindow()
 
     # Set Up the Edit customer Window - windowEditcustomer
-    windowMain.title("BOSTON BIKES - DELETE A SUPPLIER")
+    mainWindow.title("BOSTON BIKES - DELETE A SUPPLIER")
    
     # Place a Frame to surround heading,labels and user entries    
-    frameCustomerID = Frame(windowMain, bg="Light blue", highlightbackground="blue", highlightthickness=2)
+    frameCustomerID = Frame(mainWindow, bg="Light blue", highlightbackground="blue", highlightthickness=2)
     frameCustomerID.place( x=50, y=10, width = 280, height = 280)
    
     # Place the Heading
-    labelHeadingCustomerID = Label(windowMain, text="Select Customer ID", font=('Arial', 16), bg="Light blue")
+    labelHeadingCustomerID = Label(mainWindow, text="Select Customer ID", font=('Arial', 16), bg="Light blue")
     labelHeadingCustomerID.place( x=70, y=12, width=200, height=40)
 
     # Place the Label
-    labelEnterCustomerID = Label( windowMain, text = "Enter Customer ID:").place( x=70, y=60)
+    labelEnterCustomerID = Label( mainWindow, text = "Enter Customer ID:").place( x=70, y=60)
 
     # Place the Entry Box
-    entrySelectedCustomerID = Entry( windowMain, textvariable = customerID, width=20, bg="yellow")
+    entrySelectedCustomerID = Entry( mainWindow, textvariable = customerID, width=20, bg="yellow")
     entrySelectedCustomerID.place( x=180, y=60)
     entrySelectedCustomerID.delete(0, END)
 
     # Place the Button Delete Customer
-    buttonDeleteCustomer = Button( windowMain, text="Delete Customer", width=32, command = deleteCustomer)
+    buttonDeleteCustomer = Button( mainWindow, text="Delete Customer", width=32, command = deleteCustomer)
     buttonDeleteCustomer.place( x=70, y=100)
    
 #----------------------------------------------------------------------------------------------------------
@@ -876,15 +725,15 @@ def deleteCustomer():
 
     sqlCommand = "DELETE FROM customerTable WHERE customerID = '" + customerID.get() + "'"
 
-    bostonBikesDatabase.execute(sqlCommand)
-    bostonBikesDatabase.commit()
+    tobysTrucksDatabase.execute(sqlCommand)
+    tobysTrucksDatabase.commit()
 
     # Place a frame to surround the message    
-    frameMessage = Frame(windowMain, bg="Light blue", highlightbackground="blue", highlightthickness=2)
+    frameMessage = Frame(mainWindow, bg="Light blue", highlightbackground="blue", highlightthickness=2)
     frameMessage.place( x=90, y=160, width = 200, height = 100)
    
     # Place the Message
-    labelMessage = Label( windowMain, font="12", bg="Light blue", text = "Customer Deleted", justify = LEFT)
+    labelMessage = Label( mainWindow, font="12", bg="Light blue", text = "Customer Deleted", justify = LEFT)
     labelMessage.place( x=92, y=162)
 
 #==========================================================================================================
@@ -895,13 +744,13 @@ def deleteCustomer():
 
 def listOrders():
 
-    clearWindowMain()
+    clearMainWindow()
    
     # Set Title
-    windowMain.title("BOSTON BIKES - ORDERS LIST")
+    mainWindow.title("BOSTON BIKES - ORDERS LIST")
 
     # Place the Listbox to contain the Order List
-    listOrders = Listbox(windowMain, width=80, height=20, font=("Consolas",14), selectmode="single")
+    listOrders = Listbox(mainWindow, width=80, height=20, font=("Consolas",14), selectmode="single")
     listOrders.place( x=30, y=15)
     listOrders.config( bg="Light blue", highlightbackground="blue", highlightthickness=2)
 
@@ -920,7 +769,7 @@ def listOrders():
    
     sqlCommand = "SELECT * FROM orderTable"
 
-    for row in bostonBikesDatabase.execute(sqlCommand):
+    for row in tobysTrucksDatabase.execute(sqlCommand):
            
         listOrders.insert(END, " %-8s %-11s %-12s %-6s" %(row))
 
@@ -934,7 +783,7 @@ def editOrder(event):
 
     sqlCommand = "SELECT * from orderTable WHERE orderID = " + "'" + selectedOrderID.get() + "'"
    
-    queryResults = bostonBikesDatabase.execute(sqlCommand)
+    queryResults = tobysTrucksDatabase.execute(sqlCommand)
    
     # Fetch one record from Query Results (should be only one result here anyway)    
     orderRecord = queryResults.fetchone()
@@ -948,7 +797,7 @@ def editOrder(event):
     setUpOrderForm("Edit Order")
    
     # Place the Update button
-    buttonSaveOrder = Button( windowMain, text="Update Order Details", command = updateOrderDetails)
+    buttonSaveOrder = Button( mainWindow, text="Update Order Details", command = updateOrderDetails)
     buttonSaveOrder.place( x=320, y=320, width=200, height=30 )
 
 #----------------------------------------------------------------------------------------------------------
@@ -962,10 +811,10 @@ def updateOrderDetails():
                    "paid = '"            + paid.get()            + "'  "
                    "WHERE orderID = '"   + selectedOrderID.get() + "'  " )
 
-    bostonBikesDatabase.execute(sqlCommand)
-    bostonBikesDatabase.commit()
+    tobysTrucksDatabase.execute(sqlCommand)
+    tobysTrucksDatabase.commit()
 
-    labelMessage = Label( windowMain, font="11", bg="Light blue", text = "Order Updated")
+    labelMessage = Label( mainWindow, font="11", bg="Light blue", text = "Order Updated")
     labelMessage.place( x=345, y=360)
 
 #----------------------------------------------------------------------------------------------------------
@@ -981,7 +830,7 @@ def addOrder():
     setUpOrderForm("Add Order")
 
     # Place the Save button
-    buttonSaveOrder = Button( windowMain, text="Save Order Details", command = saveNewOrder)
+    buttonSaveOrder = Button( mainWindow, text="Save Order Details", command = saveNewOrder)
     buttonSaveOrder.place( x=320, y=320, width=200, height=30 )
 
 #----------------------------------------------------------------------------------------------------------
@@ -990,72 +839,72 @@ def saveNewOrder():
 
     newOrderRecord = [orderID.get(), orderCustomerID.get(), orderDate.get(), paid.get()]
 
-    bostonBikesDatabase.execute("INSERT INTO orderTable VALUES(?,?,?,?)",newOrderRecord)
-    bostonBikesDatabase.commit()
+    tobysTrucksDatabase.execute("INSERT INTO orderTable VALUES(?,?,?,?)",newOrderRecord)
+    tobysTrucksDatabase.commit()
    
     # Place the Message
-    labelMessage = Label( windowMain, font="11", bg="Light blue", text = "New Order Saved")
+    labelMessage = Label( mainWindow, font="11", bg="Light blue", text = "New Order Saved")
     labelMessage.place( x=320, y=360)
    
 #----------------------------------------------------------------------------------------------------------
 
 def setUpOrderForm(heading):
 
-    clearWindowMain()
+    clearMainWindow()
    
     # Place a frame to surround heading,labels and user entries    
-    frameEditOrder = Frame(windowMain, bg="Light blue", highlightbackground="red", highlightthickness=2)
+    frameEditOrder = Frame(mainWindow, bg="Light blue", highlightbackground="red", highlightthickness=2)
     frameEditOrder.place( x=200, y=10, width = 580, height = 400)
 
     # Place the heading  
-    labelHeadingAddOrder = Label(windowMain, text=heading, font=('Arial', 16), bg="Light blue")
+    labelHeadingAddOrder = Label(mainWindow, text=heading, font=('Arial', 16), bg="Light blue")
     labelHeadingAddOrder.place( x=320, y=12, width=200, height=30)
 
     # Place the Labels
-    Label( windowMain, bg="Light blue", text = "Order ID:"   ).place( x=220, y=60)
-    Label( windowMain, bg="Light blue", text = "CustomerID:" ).place( x=220, y=85)
-    Label( windowMain, bg="Light blue", text = "OrderDate:"  ).place( x=220, y=110)
-    Label( windowMain, bg="Light blue", text = "Paid"        ).place( x=220, y=135)
+    Label( mainWindow, bg="Light blue", text = "Order ID:"   ).place( x=220, y=60)
+    Label( mainWindow, bg="Light blue", text = "CustomerID:" ).place( x=220, y=85)
+    Label( mainWindow, bg="Light blue", text = "OrderDate:"  ).place( x=220, y=110)
+    Label( mainWindow, bg="Light blue", text = "Paid"        ).place( x=220, y=135)
 
     # Place the Data Format Labels - Information for the user
-    Label( windowMain, bg="Light blue", text = ": Format X999"           ).place( x=570, y=60)
-    Label( windowMain, bg="Light blue", text = ": From Customer Table"   ).place( x=570, y=85)
-    Label( windowMain, bg="Light blue", text = ": Valid Date dd/mm/yyyy" ).place( x=570, y=110)
-    Label( windowMain, bg="Light blue", text = ": Y or N"                ).place( x=570, y=135)
+    Label( mainWindow, bg="Light blue", text = ": Format X999"           ).place( x=570, y=60)
+    Label( mainWindow, bg="Light blue", text = ": From Customer Table"   ).place( x=570, y=85)
+    Label( mainWindow, bg="Light blue", text = ": Valid Date dd/mm/yyyy" ).place( x=570, y=110)
+    Label( mainWindow, bg="Light blue", text = ": Y or N"                ).place( x=570, y=135)
  
     # Place the Entry boxes
-    entry0 = Entry( windowMain, textvariable = orderID,         width=30, bg="yellow").place( x=320, y=60)
-    entry1 = Entry( windowMain, textvariable = orderCustomerID, width=30, bg="white") .place( x=320, y=85)
-    entry2 = Entry( windowMain, textvariable = orderDate,       width=30, bg="white") .place( x=320, y=110)
-    entry4 = Entry( windowMain, textvariable = paid,            width=30, bg="white") .place( x=320, y=135)
+    entry0 = Entry( mainWindow, textvariable = orderID,         width=30, bg="yellow").place( x=320, y=60)
+    entry1 = Entry( mainWindow, textvariable = orderCustomerID, width=30, bg="white") .place( x=320, y=85)
+    entry2 = Entry( mainWindow, textvariable = orderDate,       width=30, bg="white") .place( x=320, y=110)
+    entry4 = Entry( mainWindow, textvariable = paid,            width=30, bg="white") .place( x=320, y=135)
 
 #----------------------------------------------------------------------------------------------------------
 
 def selectOrderToDelete():
 
-    clearWindowMain()
+    clearMainWindow()
 
     # Set Up the Edit order Window - windowEditorder
-    windowMain.title("BOSTON BIKES - DELETE A SUPPLIER")
+    mainWindow.title("BOSTON BIKES - DELETE A SUPPLIER")
    
     # Place a Frame to surround heading,labels and user entries    
-    frameEnterOrderID = Frame(windowMain, bg="Light blue", highlightbackground="blue", highlightthickness=2)
+    frameEnterOrderID = Frame(mainWindow, bg="Light blue", highlightbackground="blue", highlightthickness=2)
     frameEnterOrderID.place( x=50, y=10, width = 280, height = 280)
    
     # Place the Heading
-    labelHeadingEnterOrderID = Label(windowMain, text="Select Order ID", font=('Arial', 16), bg="Light blue")
+    labelHeadingEnterOrderID = Label(mainWindow, text="Select Order ID", font=('Arial', 16), bg="Light blue")
     labelHeadingEnterOrderID.place( x=70, y=12, width=200, height=40)
 
     # Place the Label
-    labelEnterOrderID = Label( windowMain, text = "Enter Order ID:").place( x=70, y=60)
+    labelEnterOrderID = Label( mainWindow, text = "Enter Order ID:").place( x=70, y=60)
 
     # Place the Entry Box
-    entrySelectedOrderID = Entry( windowMain, textvariable = orderID, width=20, bg="yellow")
+    entrySelectedOrderID = Entry( mainWindow, textvariable = orderID, width=20, bg="yellow")
     entrySelectedOrderID.place( x=170, y=60)
     entrySelectedOrderID.delete(0, END)
 
     # Place the Button Delete Order
-    buttonDeleteOrder = Button( windowMain, text="Delete Order", width=32, command = deleteOrder)
+    buttonDeleteOrder = Button( mainWindow, text="Delete Order", width=32, command = deleteOrder)
     buttonDeleteOrder.place( x=70, y=100)
    
 #----------------------------------------------------------------------------------------------------------
@@ -1064,15 +913,15 @@ def deleteOrder():
 
     sqlCommand = "DELETE FROM orderTable WHERE orderID = '" + orderID.get() + "'"
 
-    bostonBikesDatabase.execute(sqlCommand)
-    bostonBikesDatabase.commit()
+    tobysTrucksDatabase.execute(sqlCommand)
+    tobysTrucksDatabase.commit()
 
     # Place a frame to surround the message    
-    frameMessage = Frame(windowMain, bg="Light blue", highlightbackground="blue", highlightthickness=2)
+    frameMessage = Frame(mainWindow, bg="Light blue", highlightbackground="blue", highlightthickness=2)
     frameMessage.place( x=90, y=160, width = 200, height = 100)
    
     # Place the Message
-    labelMessage = Label( windowMain, font="12", bg="Light blue", text = "Order Deleted", justify = LEFT)
+    labelMessage = Label( mainWindow, font="12", bg="Light blue", text = "Order Deleted", justify = LEFT)
     labelMessage.place( x=92, y=162)
 
 
@@ -1084,13 +933,13 @@ def deleteOrder():
 
 def listOrderItems():
 
-    clearWindowMain()
+    clearMainWindow()
    
     # Set Title
-    windowMain.title("BOSTON BIKES - ORDER ITEMS LIST")
+    mainWindow.title("BOSTON BIKES - ORDER ITEMS LIST")
 
     # Place the Listbox to contain the Order Items List
-    listOrderItems = Listbox(windowMain, width=80, height=20, font=("Consolas",14), selectmode="single")
+    listOrderItems = Listbox(mainWindow, width=80, height=20, font=("Consolas",14), selectmode="single")
     listOrderItems.place( x=30, y=15)
     listOrderItems.config( bg="Light blue", highlightbackground="blue", highlightthickness=2)
 
@@ -1104,12 +953,12 @@ def listOrderItems():
     listOrderItems.insert(END, " ")
     listOrderItems.insert(END, "  Click on an Order Item in the list to edit that Order Item.")
     listOrderItems.insert(END, " ")
-    listOrderItems.insert(END, " Order ID Bike ID Quantity")
+    listOrderItems.insert(END, " Order ID Truck ID Quantity")
     listOrderItems.insert(END, " -------- ------- --------")
    
-    sqlCommand = "SELECT * FROM orderItemsTable ORDER BY orderItemsOrderID, orderItemsBikeID"
+    sqlCommand = "SELECT * FROM orderItemsTable ORDER BY orderItemsOrderID, orderItemstruckID"
 
-    for row in bostonBikesDatabase.execute(sqlCommand):
+    for row in tobysTrucksDatabase.execute(sqlCommand):
            
         listOrderItems.insert(END, " %-9s %-10s %-5d" %(row))
 
@@ -1120,26 +969,26 @@ def editOrderItem(event):
     listIndex = event.widget.curselection()[0] # Find index number of the item clicked in the list
 
     selectedOrderID.set( event.widget.get(listIndex)[1:5] ) # Find clicked orderItemsOrderID
-    selectedBikeID.set( event.widget.get(listIndex)[11:15]) # Find clicked orderItemsBikeID
+    selectedTruckID.set( event.widget.get(listIndex)[11:15]) # Find clicked orderItemstruckID
 
     sqlCommand = ( "SELECT * from orderItemsTable "
                    "WHERE orderItemsOrderID = " + "'" + selectedOrderID.get() + "' "
-                   "AND orderItemsBikeID = " + "'" + selectedBikeID.get() + "'" )
+                   "AND orderItemstruckID = " + "'" + selectedTruckID.get() + "'" )
     
-    queryResults = bostonBikesDatabase.execute(sqlCommand)
+    queryResults = tobysTrucksDatabase.execute(sqlCommand)
    
     # Fetch one record from Query Results (should be only one result here anyway)    
     orderItemRecord = queryResults.fetchone()
      
     # Put Order Items Data into the Tkinter String Vars
     orderItemsOrderID.set(orderItemRecord[0])
-    orderItemsBikeID.set(orderItemRecord[1])
+    orderItemsTruckID.set(orderItemRecord[1])
     quantity.set(orderItemRecord[2])
 
     setUpOrderItemsForm("Edit Order Items")
    
     # Place the Update button
-    buttonSaveOrderItems = Button( windowMain, text="Update Order Item Details", command = updateOrderItemDetails)
+    buttonSaveOrderItems = Button( mainWindow, text="Update Order Item Details", command = updateOrderItemDetails)
     buttonSaveOrderItems.place( x=320, y=320, width=200, height=30 )
 
 #----------------------------------------------------------------------------------------------------------
@@ -1148,15 +997,15 @@ def updateOrderItemDetails():
 
     sqlCommand = ( "UPDATE  orderItemsTable "
                    "SET     orderItemsOrderID = '" + orderItemsOrderID.get() + "', "
-                   "        orderItemsBikeID  = '" + orderItemsBikeID.get()  + "', "
+                   "        orderItemstruckID  = '" + orderItemsTruckID.get()  + "', "
                    "        quantity          = '" + quantity.get()          + "'  "
                    "WHERE   orderItemsOrderID = '" + selectedOrderID.get() + "'  "
-                   "AND     orderItemsBikeID  = '" + selectedBikeID.get()  + "'" )
+                   "AND     orderItemstruckID  = '" + selectedTruckID.get()  + "'" )
 
-    bostonBikesDatabase.execute(sqlCommand)
-    bostonBikesDatabase.commit()
+    tobysTrucksDatabase.execute(sqlCommand)
+    tobysTrucksDatabase.commit()
 
-    labelMessage = Label( windowMain, font="11", bg="Light blue", text = "Order Items Updated")
+    labelMessage = Label( mainWindow, font="11", bg="Light blue", text = "Order Items Updated")
     labelMessage.place( x=335, y=360)
 
 #----------------------------------------------------------------------------------------------------------
@@ -1165,88 +1014,88 @@ def addOrderItem():
 
     # EMPTY THE ENTRY BOXES
     orderItemsOrderID.set("")
-    orderItemsBikeID.set("")
+    orderItemsTruckID.set("")
     quantity.set("")
 
     setUpOrderItemsForm("Add Order Item")
 
     # Place the Save button
-    buttonSaveOrderItem = Button( windowMain, text="Save Order Item Details", command = saveNewOrderItem)
+    buttonSaveOrderItem = Button( mainWindow, text="Save Order Item Details", command = saveNewOrderItem)
     buttonSaveOrderItem.place( x=320, y=320, width=200, height=30 )
 
 #----------------------------------------------------------------------------------------------------------
 
 def saveNewOrderItem():
 
-    newOrderItemsRecord = [orderItemsOrderID.get(), orderItemsBikeID.get(), quantity.get()]
+    newOrderItemsRecord = [orderItemsOrderID.get(), orderItemsTruckID.get(), quantity.get()]
 
-    bostonBikesDatabase.execute("INSERT INTO orderItemsTable VALUES(?,?,?)", newOrderItemsRecord)
-    bostonBikesDatabase.commit()
+    tobysTrucksDatabase.execute("INSERT INTO orderItemsTable VALUES(?,?,?)", newOrderItemsRecord)
+    tobysTrucksDatabase.commit()
    
     # Place the Message
-    labelMessage = Label( windowMain, font="11", bg="Light blue", text = "New Order Item Saved")
+    labelMessage = Label( mainWindow, font="11", bg="Light blue", text = "New Order Item Saved")
     labelMessage.place( x=320, y=360)
    
 #----------------------------------------------------------------------------------------------------------
 
 def setUpOrderItemsForm(heading):
 
-    clearWindowMain()
+    clearMainWindow()
    
     # Place a frame to surround heading,labels and user entries    
-    frameEditOrderItem = Frame(windowMain, bg="Light blue", highlightbackground="red", highlightthickness=2)
+    frameEditOrderItem = Frame(mainWindow, bg="Light blue", highlightbackground="red", highlightthickness=2)
     frameEditOrderItem.place( x=200, y=10, width = 580, height = 400)
 
     # Place the heading  
-    labelHeadingAddOrderItem = Label(windowMain, text=heading, font=('Arial', 16), bg="Light blue")
+    labelHeadingAddOrderItem = Label(mainWindow, text=heading, font=('Arial', 16), bg="Light blue")
     labelHeadingAddOrderItem.place( x=320, y=12, width=200, height=30)
 
     # Place the Labels
-    Label( windowMain, bg="Light blue", text = "Order ID:" ).place( x=220, y=60)
-    Label( windowMain, bg="Light blue", text = "Bike ID:"  ).place( x=220, y=85)
-    Label( windowMain, bg="Light blue", text = "Quantity:" ).place( x=220, y=110)
+    Label( mainWindow, bg="Light blue", text = "Order ID:" ).place( x=220, y=60)
+    Label( mainWindow, bg="Light blue", text = "Truck ID:"  ).place( x=220, y=85)
+    Label( mainWindow, bg="Light blue", text = "Quantity:" ).place( x=220, y=110)
 
     # Place the Data Format Labels - Information for the user    (Validation - None Added Yet)
-    Label( windowMain, bg="Light blue", text = ": From Order Table" ).place( x=570, y=60)
-    Label( windowMain, bg="Light blue", text = ": From Bike Table"  ).place( x=570, y=85)
-    Label( windowMain, bg="Light blue", text = ": 1 - 100"          ).place( x=570, y=110)
+    Label( mainWindow, bg="Light blue", text = ": From Order Table" ).place( x=570, y=60)
+    Label( mainWindow, bg="Light blue", text = ": From Truck Table"  ).place( x=570, y=85)
+    Label( mainWindow, bg="Light blue", text = ": 1 - 100"          ).place( x=570, y=110)
    
     # Place the Entry boxes
-    entry0 = Entry( windowMain, textvariable = orderItemsOrderID, width=30, bg="yellow") .place( x=320, y=60)
-    entry1 = Entry( windowMain, textvariable = orderItemsBikeID,  width=30, bg="yellow") .place( x=320, y=85)
-    entry2 = Entry( windowMain, textvariable = quantity,          width=30, bg="white")  .place( x=320, y=110)
+    entry0 = Entry( mainWindow, textvariable = orderItemsOrderID, width=30, bg="yellow") .place( x=320, y=60)
+    entry1 = Entry( mainWindow, textvariable = orderItemsTruckID,  width=30, bg="yellow") .place( x=320, y=85)
+    entry2 = Entry( mainWindow, textvariable = quantity,          width=30, bg="white")  .place( x=320, y=110)
 
 #----------------------------------------------------------------------------------------------------------
 
 def selectOrderItemToDelete():
 
-    clearWindowMain()
+    clearMainWindow()
 
     # Set Up the Edit order item Window - windowEditorder item
-    windowMain.title("BOSTON BIKES - DELETE A ORDER ITEM")
+    mainWindow.title("BOSTON BIKES - DELETE A ORDER ITEM")
    
     # Place a Frame to surround heading,labels and user entries    
-    frameEnterOrderitem = Frame(windowMain, bg="Light blue", highlightbackground="blue", highlightthickness=2)
+    frameEnterOrderitem = Frame(mainWindow, bg="Light blue", highlightbackground="blue", highlightthickness=2)
     frameEnterOrderitem.place( x=50, y=10, width = 380, height = 280)
    
     # Place the Heading
-    labelHeading = Label(windowMain, text="Select Order Item to Delete", font=('Arial', 16), bg="Light blue")
+    labelHeading = Label(mainWindow, text="Select Order Item to Delete", font=('Arial', 16), bg="Light blue")
     labelHeading.place( x=70, y=12, width=300, height=40)
 
     # Place the Labels
-    labelEnterOrderItemOrderID = Label( windowMain, text = "Enter Order Item Order ID:").place( x=70, y=60)
-    labelEnterOrderItemBikeID = Label( windowMain, text = "Enter Order Item Bike ID :").place( x=70, y=85)
+    labelEnterOrderItemOrderID = Label( mainWindow, text = "Enter Order Item Order ID:").place( x=70, y=60)
+    labelEnterOrderItemtruckID = Label( mainWindow, text = "Enter Order Item Truck ID :").place( x=70, y=85)
    
     # Place the Entry Box
     orderItemsOrderID.set("")
-    orderItemsBikeID.set("")
-    entrySelectedOrderItemOrderID = Entry( windowMain, textvariable = orderItemsOrderID, width=20, bg="yellow")
+    orderItemsTruckID.set("")
+    entrySelectedOrderItemOrderID = Entry( mainWindow, textvariable = orderItemsOrderID, width=20, bg="yellow")
     entrySelectedOrderItemOrderID.place( x=280, y=60)
-    entrySelectedOrderItemBikeID = Entry( windowMain, textvariable = orderItemsBikeID, width=20, bg="yellow")
-    entrySelectedOrderItemBikeID.place( x=280, y=85)
+    entrySelectedOrderItemtruckID = Entry( mainWindow, textvariable = orderItemsTruckID, width=20, bg="yellow")
+    entrySelectedOrderItemtruckID.place( x=280, y=85)
 
     # Place the Button Delete Order Items
-    buttonDeleteOrderItem = Button( windowMain, text="Delete Order Item", width=32, command = deleteOrderItem)
+    buttonDeleteOrderItem = Button( mainWindow, text="Delete Order Item", width=32, command = deleteOrderItem)
     buttonDeleteOrderItem.place( x=100, y=130)
    
 #----------------------------------------------------------------------------------------------------------
@@ -1255,17 +1104,17 @@ def deleteOrderItem():
 
     sqlCommand = ( "DELETE FROM orderItemsTable "
                    "WHERE orderItemsOrderID = '" + orderItemsOrderID.get() + "'"
-                   "AND   orderItemsBikeID  = '" + orderItemsBikeID.get()  + "'" )
+                   "AND   orderItemstruckID  = '" + orderItemsTruckID.get()  + "'" )
 
-    bostonBikesDatabase.execute(sqlCommand)
-    bostonBikesDatabase.commit()
+    tobysTrucksDatabase.execute(sqlCommand)
+    tobysTrucksDatabase.commit()
 
     # Place a frame to surround the message    
-    frameMessage = Frame(windowMain, bg="Light blue", highlightbackground="blue", highlightthickness=2)
+    frameMessage = Frame(mainWindow, bg="Light blue", highlightbackground="blue", highlightthickness=2)
     frameMessage.place( x=90, y=160, width = 200, height = 100)
    
     # Place the Message
-    labelMessage = Label(windowMain,font="12",bg="Light blue",text = "Order Item Deleted",justify = LEFT)
+    labelMessage = Label(mainWindow,font="12",bg="Light blue",text = "Order Item Deleted",justify = LEFT)
     labelMessage.place( x=92, y=162)
     
 #==========================================================================================================
@@ -1282,18 +1131,18 @@ def deleteOrderItem():
 
 def selectSupplierForOrderNotes():     # SELECTION HERE USING COMBO BOX WITH ORDER NUMBERS
    
-    clearWindowMain()
+    clearMainWindow()
     
-    windowMain.title("BOSTON BIKES - ORDER BIKES FROM SUPPLIER")
+    mainWindow.title("BOSTON BIKES - ORDER BIKES FROM SUPPLIER")
 
-    labelSupplierID = Label(windowMain, text="Select Supplier ID for Order Notes : ", font=('Arial', 10))
+    labelSupplierID = Label(mainWindow, text="Select Supplier ID for Order Notes : ", font=('Arial', 10))
     labelSupplierID.place( x=120, y=8, width=220, height=40)
 
     sqlCommand = "SELECT supplierID from supplierTable"
 
     comboBoxValues = []
     
-    for row in bostonBikesDatabase.execute(sqlCommand):
+    for row in tobysTrucksDatabase.execute(sqlCommand):
         comboBoxValues += row
      
     comboBoxSupplierIDs = ttk.Combobox(state = "readonly",textvariable=supplierID,values = comboBoxValues )
@@ -1306,10 +1155,10 @@ def selectSupplierForOrderNotes():     # SELECTION HERE USING COMBO BOX WITH ORD
 def displayOrderNotes(event):
    
     # Set Up the Edit Car Window - windowEditCar
-    windowMain.title("BOSTON Bikes - ORDER NOTES")
+    mainWindow.title("BOSTON Trucks - ORDER NOTES")
 
     # Place the Listbox to contain the Sales List
-    listReport = Listbox(windowMain, width=71, height=25, font=("Consolas",10), selectmode="single")
+    listReport = Listbox(mainWindow, width=71, height=25, font=("Consolas",10), selectmode="single")
     listReport.place( x=100, y=55)
     listReport.config( bg="Light blue", highlightbackground="blue", highlightthickness=2)
  
@@ -1318,14 +1167,14 @@ def displayOrderNotes(event):
                             "WHERE supplierID = '" + supplierID.get() + "' "
                             "ORDER BY supplierID")
 
-    for supplierRow in bostonBikesDatabase.execute(sqlCommandSuppliers):
+    for supplierRow in tobysTrucksDatabase.execute(sqlCommandSuppliers):
         
         listReport.insert( END, "  ")
         listReport.insert( END, " =====================================================================")
         listReport.insert( END, "             BOSTON BIKES - FOR ALL YOUR CYCLE NEEDS                 ")
         listReport.insert( END, " ---------------------------------------------------------------------")
-        listReport.insert( END, "    Boston Bikes, Spokane, South Wales.     Tel 018871 8181181       ")
-        listReport.insert( END, "    enquiries@BostonBikes.com         VAT Reg Number 120987245       ")
+        listReport.insert( END, "    Boston Trucks, Spokane, South Wales.     Tel 018871 8181181       ")
+        listReport.insert( END, "    enquiries@BostonTrucks.com         VAT Reg Number 120987245       ")
         listReport.insert( END, " ---------------------------------------------------------------------")
         listReport.insert( END, "               Order Note for Supplier ID :" + supplierRow[0]   )
         listReport.insert( END, " ---------------------------------------------------------------------")
@@ -1334,33 +1183,33 @@ def displayOrderNotes(event):
         listReport.insert( END, "               Supplier Phone    : " + supplierRow[3]  )
         listReport.insert( END, "               Supplier Email    : " + supplierRow[4]  )
         listReport.insert( END, " ---------------------------------------------------------------------")
-        listReport.insert( END, " Please send the following bikes :")
+        listReport.insert( END, " Please send the following trucks :")
         listReport.insert( END, " ---------------------------------------------------------------------")
-        listReport.insert( END, " Bike Bike     Bike     Bike  Bike      ReOrder  Sub")
+        listReport.insert( END, " Truck Truck     Truck     Truck  Truck      ReOrder  Sub")
         listReport.insert( END, " ID   Make     Model    Size  Price     Amount   Total")
         listReport.insert( END, " ---- -------- -------- ----  --------- -------  ---------")  
 
-        sqlCommandBikes = ( "SELECT bikeID, make, model, size, bikeSupplierID, buyingPrice, "
+        sqlCommandTrucks = ( "SELECT truckID, make, model, size, truckSupplierID, buyingPrice, "
                             "stockLevel, reorderLevel, reorderAmount "
-                            "FROM bikeTable "
-                            "WHERE bikeSupplierID = '" + supplierRow[0] + "' AND stockLevel <= reorderLevel "
-                            "ORDER BY bikeID" )
+                            "FROM truckTable "
+                            "WHERE truckSupplierID = '" + supplierRow[0] + "' AND stockLevel <= reorderLevel "
+                            "ORDER BY truckID" )
 
         grandTotal = float(0)
 
-        for bikeRow in bostonBikesDatabase.execute(sqlCommandBikes):
+        for truckRow in tobysTrucksDatabase.execute(sqlCommandTrucks):
 
-            bikeLine = ( " %-5s"     %(bikeRow[0]) +               # Bike ID
-                         "%-9s"      %(bikeRow[1]) +               # Make
-                         "%-10s"     %(bikeRow[2]) +               # Model
-                         "%-5s"      %(bikeRow[3]) +               # Size
-                         "£%8.2f"    %(bikeRow[5]) +               # Buying Price
-                         "%4d      " %(bikeRow[8]) +               # Reorder Amount
-                         "£%8.2f"    %(bikeRow[5] * bikeRow[8]) )  # Sub Total
+            truckLine = ( " %-5s"     %(truckRow[0]) +               # Truck ID
+                         "%-9s"      %(truckRow[1]) +               # Make
+                         "%-10s"     %(truckRow[2]) +               # Model
+                         "%-5s"      %(truckRow[3]) +               # Size
+                         "£%8.2f"    %(truckRow[5]) +               # Buying Price
+                         "%4d      " %(truckRow[8]) +               # Reorder Amount
+                         "£%8.2f"    %(truckRow[5] * truckRow[8]) )  # Sub Total
 
-            listReport.insert( END, bikeLine)
+            listReport.insert( END, truckLine)
 
-            grandTotal += (bikeRow[5]) * (bikeRow[8])
+            grandTotal += (truckRow[5]) * (truckRow[8])
 
         if grandTotal > 0:
 
@@ -1379,18 +1228,18 @@ def displayOrderNotes(event):
 
 def selectOrderForReceipt():     # SELECTION HERE USING COMBO BOX WITH ORDER NUMBERS
    
-    clearWindowMain()
+    clearMainWindow()
     
-    windowMain.title("BOSTON BIKES - ORDER RECEIPT")
+    mainWindow.title("BOSTON BIKES - ORDER RECEIPT")
 
-    labelEnterOrderID = Label(windowMain, text="Select Order ID for Receipt : ", font=('Arial', 10))
+    labelEnterOrderID = Label(mainWindow, text="Select Order ID for Receipt : ", font=('Arial', 10))
     labelEnterOrderID.place( x=110, y=8, width=200, height=40)
 
     sqlCommand = "SELECT orderID from orderTable"
 
     comboBoxValues = []
     
-    for row in bostonBikesDatabase.execute(sqlCommand):
+    for row in tobysTrucksDatabase.execute(sqlCommand):
         comboBoxValues += row
      
     comboBoxOrderIDs = ttk.Combobox( state = "readonly", textvariable = orderID, values = comboBoxValues )
@@ -1402,10 +1251,10 @@ def selectOrderForReceipt():     # SELECTION HERE USING COMBO BOX WITH ORDER NUM
  
 def displayReceipt(event):
 
-    windowMain.title("BOSTON BIKES - RECEIPT")
+    mainWindow.title("BOSTON BIKES - RECEIPT")
 
     # Place the Listbox to contain the Receipt
-    listReport = Listbox(windowMain, width=71, height=24, font=("Consolas",10))
+    listReport = Listbox(mainWindow, width=71, height=24, font=("Consolas",10))
     listReport.place( x=100, y=55)
     listReport.config( bg="Light blue", highlightbackground="blue", highlightthickness=2)
 
@@ -1418,14 +1267,14 @@ def displayReceipt(event):
 
     currentDate = date.today().strftime('%d-%m-%Y')
 
-    for row in bostonBikesDatabase.execute(sqlCommand):
+    for row in tobysTrucksDatabase.execute(sqlCommand):
 
         listReport.insert( END, " ")
         listReport.insert( END, " ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
         listReport.insert( END, "          BOSTON BIKES - RECEIPT - THANK YOU FOR YOUR ORDER           ")
         listReport.insert( END, " ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
-        listReport.insert( END, " Boston Bikes, BOSTON Island, South Wales.    Tel 018871 8181181      ")
-        listReport.insert( END, " E-Mail  enquiries@BostonBikes.com         VAT Reg Number 120987245   ")
+        listReport.insert( END, " Boston Trucks, BOSTON Island, South Wales.    Tel 018871 8181181      ")
+        listReport.insert( END, " E-Mail  enquiries@BostonTrucks.com         VAT Reg Number 120987245   ")
         listReport.insert( END, " ---------------------------------------------------------------------")
         listReport.insert( END, "   Receipt for Order ID : " + row[0] + "        Date : " + currentDate )
         listReport.insert( END, " ---------------------------------------------------------------------")
@@ -1435,31 +1284,31 @@ def displayReceipt(event):
         listReport.insert( END, " "*29                                 + " Phone       : "     + row[7] )
         listReport.insert( END, " "*29                                 + " Email       : "     + row[8] )
         listReport.insert( END, " ---------------------------------------------------------------------")
-        listReport.insert( END, " Bike Bike     Bike     Bike  Bike      Bike     Sub")
+        listReport.insert( END, " Truck Truck     Truck     Truck  Truck      Truck     Sub")
         listReport.insert( END, " ID   Make     Model    Size  Price     Quantity Total")
         listReport.insert( END, " ---- -------- -------- ----  --------- -------  ---------")  
 
-    sqlCommandBikes = ( "SELECT orderItemsOrderID, orderItemsBikeID, quantity, "
-                        "       bikeID, make, model, size, sellingPrice "
-                        "FROM   orderItemsTable, bikeTable "
+    sqlCommandTrucks = ( "SELECT orderItemsOrderID, orderItemstruckID, quantity, "
+                        "       truckID, make, model, size, sellingPrice "
+                        "FROM   orderItemsTable, truckTable "
                         "WHERE  orderItemsOrderID = '" + orderID.get() + "' "
-                        "AND    orderItemsBikeID = bikeID " )
+                        "AND    orderItemstruckID = truckID " )
 
     grandTotal = float(0)
 
-    for bikeRow in bostonBikesDatabase.execute(sqlCommandBikes):
+    for truckRow in tobysTrucksDatabase.execute(sqlCommandTrucks):
 
-        bikeLine = ( " %-5s"     %(bikeRow[3]) +               # Bike ID
-                     "%-9s"      %(bikeRow[4]) +               # Make
-                     "%-10s"     %(bikeRow[5]) +               # Model
-                     "%-5s"      %(bikeRow[6]) +               # Size
-                     "£%8.2f"    %(bikeRow[7]) +               # Selling Price
-                     "%4d      " %(bikeRow[2]) +               # Quantity
-                     "£%8.2f"    %(bikeRow[7] * bikeRow[2]) )  # Sub Total
+        truckLine = ( " %-5s"     %(truckRow[3]) +               # Truck ID
+                     "%-9s"      %(truckRow[4]) +               # Make
+                     "%-10s"     %(truckRow[5]) +               # Model
+                     "%-5s"      %(truckRow[6]) +               # Size
+                     "£%8.2f"    %(truckRow[7]) +               # Selling Price
+                     "%4d      " %(truckRow[2]) +               # Quantity
+                     "£%8.2f"    %(truckRow[7] * truckRow[2]) )  # Sub Total
 
-        listReport.insert( END, bikeLine)
+        listReport.insert( END, truckLine)
 
-        grandTotal += (bikeRow[7]) * (bikeRow[2])
+        grandTotal += (truckRow[7]) * (truckRow[2])
 
     if grandTotal > 0:
         listReport.insert( END, " ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
@@ -1476,11 +1325,11 @@ def displayReceipt(event):
 
 def selectYearForProfitReport():     # SELECTION HERE USING COMBO BOX WITH YEARS
    
-    clearWindowMain()
+    clearMainWindow()
     
-    windowMain.title("BOSTON BIKES - ORDER RECEIPT")
+    mainWindow.title("BOSTON BIKES - ORDER RECEIPT")
  
-    labelEnterOrderID = Label(windowMain, text="Select Year for Profit Report : ", font=('Arial', 10))
+    labelEnterOrderID = Label(mainWindow, text="Select Year for Profit Report : ", font=('Arial', 10))
     labelEnterOrderID.place( x=110, y=8, width=200, height=40)
     
     currentYear = int(date.today().strftime('%Y'))
@@ -1499,10 +1348,10 @@ def selectYearForProfitReport():     # SELECTION HERE USING COMBO BOX WITH YEARS
     
 def profitReport(event):
     
-    windowMain.title("BOSTON BIKES - PROFIT REPORT")
+    mainWindow.title("BOSTON BIKES - PROFIT REPORT")
 
     # Place the Listbox to contain the Receipt
-    listReport = Listbox(windowMain, width=71, height=26, font=("Consolas",10))
+    listReport = Listbox(mainWindow, width=71, height=26, font=("Consolas",10))
     listReport.place( x=100, y=55)
     listReport.config( bg="Light blue", highlightbackground="blue", highlightthickness=2)
 
@@ -1518,26 +1367,26 @@ def profitReport(event):
     currentDate = date.today().strftime('%d-%m-%Y')
     
     sqlCommand = ( "SELECT orderID, orderDate, paid, "
-                   "       orderItemsOrderID, orderItemsBikeID, quantity, "
-                   "       bikeID, buyingPrice, sellingPrice, "
+                   "       orderItemsOrderID, orderItemstruckID, quantity, "
+                   "       truckID, buyingPrice, sellingPrice, "
                    "       ((sellingPrice - buyingPrice) * quantity) " # ORDER PROFIT CALCULATED FIELD
-                   "FROM   orderTable, orderItemsTable, bikeTable "
+                   "FROM   orderTable, orderItemsTable, truckTable "
                    "WHERE  orderID = orderItemsOrderID "
-                   "AND    bikeID = orderItemsBikeID "
+                   "AND    truckID = orderItemstruckID "
                    "AND    SUBSTR(orderDate,7,10) = '" + yearForProfitReport.get() + "' " )                
 
-    queryResults = bostonBikesDatabase.execute(sqlCommand)
+    queryResults = tobysTrucksDatabase.execute(sqlCommand)
 
     allQueryResults = queryResults.fetchall()
 
-    totalBikesSold = int(0)
+    totalTrucksSold = int(0)
     totalOutGoings = float(0)
     totalIncome = float(0)
     unPaidIncome = float(0)
     unPaidProfit = float(0)
     totalProfit = float(0)
    
-    listReport.insert( END, " Order Order      Paid Quantity Bike  Buying     Selling    Order Item ")
+    listReport.insert( END, " Order Order      Paid Quantity Truck  Buying     Selling    Order Item ")
     listReport.insert( END, " ID    Date                     ID    Price      Price      Profit     ")
     listReport.insert( END, " ----- ---------- ---- -------- ----  ---------- ---------- ---------- ")
     
@@ -1547,7 +1396,7 @@ def profitReport(event):
                           "%-12s"    %(row[1])  +  # Order Date
                           "%-8s"     %(row[2])  +  # Paid Y or N
                           "%-5s"     %(row[5])  +  # Quantity
-                          "%-5s"     %(row[6])  +  # Bike Id
+                          "%-5s"     %(row[6])  +  # Truck Id
                           " £%8.2f"  %(row[7])  +  # Buying Price
                           "  £%8.2f" %(row[8])  +  # Selling Price
                           "  £%8.2f" %(row[9])  )  # Order Profit
@@ -1555,7 +1404,7 @@ def profitReport(event):
         listReport.insert( END, orderItemLine)
 
         totalOutGoings += (row[7] * row[5])
-        totalBikesSold += int(row[5])
+        totalTrucksSold += int(row[5])
 
         if row[2] == "Y":                      # Order has been Paid
             totalProfit += row[9]
@@ -1565,7 +1414,7 @@ def profitReport(event):
             unPaidIncome += (row[8] * row[5])
             
     listReport.insert( END, " =====================================================================")             
-    listReport.insert( END, " Total Bikes Sold        " + "  %8d"  %(totalBikesSold))
+    listReport.insert( END, " Total Trucks Sold        " + "  %8d"  %(totalTrucksSold))
     listReport.insert( END, " Total Out Goings        " + "£%9.2f" %(totalOutGoings))    
     listReport.insert( END, " Total Actual Income     " + "£%9.2f" %(totalIncome))
     listReport.insert( END, " ---------------------------------------------------------------------")
@@ -1579,13 +1428,13 @@ def profitReport(event):
 ########  BIKES IN STOCK REPORT  ####### 
 #----------------------------------------------------------------------------------------------------------
 
-def bikesInStock():
+def trucksInStock():
        
-    clearWindowMain()
+    clearMainWindow()
     
-    windowMain.title("BOSTON BIKES - BIKES IN STOCK")
+    mainWindow.title("BOSTON BIKES - BIKES IN STOCK")
     
-    listReport = Listbox(windowMain, width=71, height=26, font=("Consolas",10))
+    listReport = Listbox(mainWindow, width=71, height=26, font=("Consolas",10))
     listReport.place( x=100, y=15)
     listReport.config( bg="Light blue", highlightbackground="blue", highlightthickness=2)
 
@@ -1597,14 +1446,14 @@ def bikesInStock():
     listReport.insert( END, " =====================================================================")
     listReport.insert( END, "         Created on  : " + currentDate )
     listReport.insert( END, " ---------------------------------------------------------------------")
-    listReport.insert( END, " Bike Bike     Bike     Bike   Stock ")
+    listReport.insert( END, " Truck Truck     Truck     Truck   Stock ")
     listReport.insert( END, " ID   Make     Model    Size   Level")
     listReport.insert( END, " ---- -------- -------- ----   --------")
     
-    sqlCommand = ( "SELECT bikeID, make, model, size, stockLevel "
-                   "FROM   bikeTable " )
+    sqlCommand = ( "SELECT truckID, make, model, size, stockLevel "
+                   "FROM   truckTable " )
 
-    queryResults = bostonBikesDatabase.execute(sqlCommand)
+    queryResults = tobysTrucksDatabase.execute(sqlCommand)
 
     allQueryResults = queryResults.fetchall()
     
@@ -1614,13 +1463,13 @@ def bikesInStock():
 
     listReport.insert( END, " ---------------------------------------------------------------------")
         
-    sqlCommand = ( "SELECT SUM(stockLevel) FROM bikeTable" )   # Make a Total of all stock
+    sqlCommand = ( "SELECT SUM(stockLevel) FROM truckTable" )   # Make a Total of all stock
 
-    queryResults = bostonBikesDatabase.execute(sqlCommand)
+    queryResults = tobysTrucksDatabase.execute(sqlCommand)
 
     totalStock = queryResults.fetchone()[0]
 
-    listReport.insert( END, " Total Bikes in stock :         " + str(totalStock) )
+    listReport.insert( END, " Total Trucks in stock :         " + str(totalStock) )
     listReport.insert( END, " =====================================================================")
 
 #=========================================================================================================
