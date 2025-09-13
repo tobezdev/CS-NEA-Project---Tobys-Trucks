@@ -18,9 +18,14 @@ Toby Smith
 """
 
 #### IMPORTS ####
+import os
 import sqlite3
 from datetime import date
 from tkinter import Tk, PhotoImage, StringVar, Menu, Listbox, Button, Label, Entry, Frame, ttk, messagebox, Canvas, END, LEFT
+
+root = os.path.dirname(os.path.dirname(__file__))
+src = os.path.join(root, 'src')
+assets = os.path.join(src, 'assets')
 
 #----------------------------------------------------------------------------------------------------------
 #### DATABASE SETUP ####
@@ -84,7 +89,7 @@ except sqlite3.Error as e:
 #### TKINTER SETUP ####
 
 mainWindow = Tk()
-tobysTrucksPicture = PhotoImage(file="assets/tobys-trucks.png")
+tobysTrucksPicture = PhotoImage(file=os.path.join(assets, "tobys-trucks.png"))
 
 truckID = StringVar()
 make = StringVar()
@@ -186,7 +191,7 @@ def setUpMainWindow():
     reportsMenu.add_command(label="Trucks In Stock", command = trucksInStock)
 
     mainWindow.config(menu=menuBar)
-    mainWindow.iconbitmap("assets/tobys-trucks.ico")
+    mainWindow.iconbitmap(os.path.join(assets, "tobys-trucks.ico"))
 
     if firstTime == True:    
         canvasPicture = Canvas( mainWindow, width=1000, height=500)
@@ -423,7 +428,7 @@ def listSuppliers():
     suppliersList.insert(END, " ID       Supplier Name  Address        Phone        Email         ")
     suppliersList.insert(END, " -------- -------------- -------------- ------------ --------------")
 
-    for row in tobysTrucksDatabase.execute("SEELECT * FROM supplierTable"):
+    for row in tobysTrucksDatabase.execute("SELECT * FROM supplierTable"):
         suppliersList.insert(END, " %-8s %-14s %-14s %-12s %-14s" %(row))
 
 #----------------------------------------------------------------------------------------------------------
