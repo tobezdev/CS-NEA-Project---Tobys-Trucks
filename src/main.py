@@ -17,6 +17,7 @@ Toby Smith
     https://github.com/tobezdev
 """
 
+#----------------------------------------------------------------------------------------------------------
 #### IMPORTS ####
 import os
 import sqlite3
@@ -140,7 +141,7 @@ def setUpMainWindow():
 
     mainWindow.geometry("870x525")
     mainWindow.title("TOBY\'S TRUCKS")
-    mainWindow.resizable (True, True)
+    mainWindow.resizable(False, False)
 
     menuBar = Menu(mainWindow)
 
