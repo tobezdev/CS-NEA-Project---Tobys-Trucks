@@ -87,6 +87,23 @@ except sqlite3.Error as e:
     print(f"Cannot setup database: {e}")
 
 #----------------------------------------------------------------------------------------------------------
+#### LOGGING SETUP ####
+
+import logging
+
+logger = logging.Logger('logger')
+logger.setLevel(logging.DEBUG)
+
+streamHandler = logging.StreamHandler()
+streamHandler.setLevel(logging.DEBUG)
+
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+streamHandler.setFormatter(formatter)
+
+logger.addHandler(streamHandler)
+
+
+#----------------------------------------------------------------------------------------------------------
 #### TKINTER SETUP ####
 
 mainWindow = Tk()
