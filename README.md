@@ -23,11 +23,11 @@ A simple stock control system for a truck retailer, built with Python, Tkinter, 
 2. (Optional) Create and activate a virtual environment:
 ```sh
 python -m venv .
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+source venv/bin/activate  # On Windows (Powershell): ./Scripts/activate
 ```
 3. Install dependencies:
 ```sh
-pip install -r requirements.txt
+./bin/pip install -r requirements.txt  # On Windows (Powershell): ./Scripts/pip install -r requirements.txt
 ```
 ##### *(If [`requirements.txt`](requirements.txt) is empty, Tkinter and sqlite3 are included with Python.)*
 
@@ -35,7 +35,7 @@ pip install -r requirements.txt
 ## Running the Application
 From the root directory, run:
 ```sh
-python3 -u src/main.py
+./bin/python3 -u src/main.py  # On Windows (Powershell): ./Scripts/python3 -u src/main.py
 ```
 
 The main window will open, providing access to all features via the menu bar.
@@ -60,11 +60,5 @@ See [`TODO.md`](TODO.md) for planned improvements.
 
 ## Author
 Toby Smith  
-[tobezdev.com](https://tobezdev.com/)  
 [GitHub: tobezdev](https://github.com/tobezdev)
-
-<br>
-<br>
-<br>
-
-*DISCLAIMER: This README was generated with assistance from GitHub Copilot.*
+[Website: tobezdev.com](https://tobezdev.com/)  
