@@ -22,7 +22,7 @@ Toby Smith
 import os
 import sqlite3
 from datetime import date
-from tkinter import Tk, PhotoImage, StringVar, Menu, Listbox, Button, Label, Entry, Frame, ttk, messagebox, Canvas, END, LEFT
+from tkinter import Tk, PhotoImage, StringVar, Menu, Listbox, Button, Label, Entry, Frame, ttk, messagebox, Canvas, END, LEFT, filedialog
 
 root = os.path.dirname(os.path.dirname(__file__))
 src = os.path.join(root, 'src')
@@ -90,6 +90,7 @@ except sqlite3.Error as e:
 #### LOGGING SETUP ####
 
 import logging
+from tkinter import scrolledtext
 
 logger = logging.Logger('logger')
 logger.setLevel(logging.DEBUG)
@@ -141,6 +142,7 @@ selectedSupplierID = StringVar()
 selectedCustomerID = StringVar()
 selectedOrderID = StringVar()
 yearForProfitReport = StringVar()
+customSQLQueryString = StringVar()
 
 firstTime = True
 
@@ -163,58 +165,60 @@ def setUpMainWindow():
     menuBar = Menu(mainWindow)
 
     fileMenu = Menu(menuBar, tearoff=0)
-    menuBar.add_cascade(label="File", menu = fileMenu)
-    fileMenu.add_command(label="Exit", command = exitProgram)
+    menuBar.add_cascade(label="File", menu=fileMenu)
+    fileMenu.add_command(label="Exit", command=exitProgram)
+    fileMenu.add_command(label="Return to Main Menu", command=clearMainWindow)
+    fileMenu.add_command(label="Run Custom SQL Query", command=setupCustomQuery)
 
     trucksMenu = Menu(menuBar, tearoff=0)
-    menuBar.add_cascade(label="Trucks", menu = trucksMenu)
-    trucksMenu.add_command(label="List Trucks", command = listTrucks)
-    trucksMenu.add_command(label="Add a New Truck", command = addTruck)
-    trucksMenu.add_command(label="Edit a Truck", command = listTrucks)
-    trucksMenu.add_command(label="Delete a Truck", command = selectTruckToDelete)
+    menuBar.add_cascade(label="Trucks", menu=trucksMenu)
+    trucksMenu.add_command(label="List Trucks", command=listTrucks)
+    trucksMenu.add_command(label="Add a New Truck", command=addTruck)
+    trucksMenu.add_command(label="Edit a Truck", command=listTrucks)
+    trucksMenu.add_command(label="Delete a Truck", command=selectTruckToDelete)
 
     suppliersMenu = Menu(menuBar, tearoff=0)
-    menuBar.add_cascade(label="Suppliers", menu = suppliersMenu)
-    suppliersMenu.add_command(label="List Suppliers", command = listSuppliers)
-    suppliersMenu.add_command(label="Add a New Supplier", command = addSupplier)
-    suppliersMenu.add_command(label="Edit a Supplier", command = listSuppliers)
-    suppliersMenu.add_command(label="Delete a Supplier", command = selectSupplierToDelete)
+    menuBar.add_cascade(label="Suppliers", menu=suppliersMenu)
+    suppliersMenu.add_command(label="List Suppliers", command=listSuppliers)
+    suppliersMenu.add_command(label="Add a New Supplier", command=addSupplier)
+    suppliersMenu.add_command(label="Edit a Supplier", command=listSuppliers)
+    suppliersMenu.add_command(label="Delete a Supplier", command=selectSupplierToDelete)
 
     customersMenu = Menu(menuBar, tearoff=0)
-    menuBar.add_cascade(label="Customers", menu = customersMenu)
-    customersMenu.add_command(label="List Customers", command = listCustomers)
-    customersMenu.add_command(label="Add a New Customer", command = addCustomer)
-    customersMenu.add_command(label="Edit a Customer", command = listCustomers)
-    customersMenu.add_command(label="Delete a Customer", command = selectCustomerToDelete)
+    menuBar.add_cascade(label="Customers", menu=customersMenu)
+    customersMenu.add_command(label="List Customers", command=listCustomers)
+    customersMenu.add_command(label="Add a New Customer", command=addCustomer)
+    customersMenu.add_command(label="Edit a Customer", command=listCustomers)
+    customersMenu.add_command(label="Delete a Customer", command=selectCustomerToDelete)
 
     ordersMenu = Menu(menuBar, tearoff=0)
-    menuBar.add_cascade(label="Orders", menu = ordersMenu)
-    ordersMenu.add_command(label="List Orders", command = listOrders)
-    ordersMenu.add_command(label="Add a New Order", command = addOrder)
-    ordersMenu.add_command(label="Edit an Order", command = listOrders)
-    ordersMenu.add_command(label="Delete an Order", command = selectOrderToDelete)
+    menuBar.add_cascade(label="Orders", menu=ordersMenu)
+    ordersMenu.add_command(label="List Orders", command=listOrders)
+    ordersMenu.add_command(label="Add a New Order", command=addOrder)
+    ordersMenu.add_command(label="Edit an Order", command=listOrders)
+    ordersMenu.add_command(label="Delete an Order", command=selectOrderToDelete)
 
     menuOrderItems = Menu(menuBar, tearoff=0)
-    menuBar.add_cascade(label="Order Items", menu = menuOrderItems)
-    menuOrderItems.add_command(label="List Order Items", command = listOrderItems)
-    menuOrderItems.add_command(label="Add a New Order Item", command = addOrderItem)
-    menuOrderItems.add_command(label="Edit an Order Item", command = listOrderItems)
-    menuOrderItems.add_command(label="Delete an Order Item", command = selectOrderItemToDelete)
+    menuBar.add_cascade(label="Order Items", menu=menuOrderItems)
+    menuOrderItems.add_command(label="List Order Items", command=listOrderItems)
+    menuOrderItems.add_command(label="Add a New Order Item", command=addOrderItem)
+    menuOrderItems.add_command(label="Edit an Order Item", command=listOrderItems)
+    menuOrderItems.add_command(label="Delete an Order Item", command=selectOrderItemToDelete)
 
     reportsMenu = Menu(menuBar, tearoff=0)
-    menuBar.add_cascade(label="Reports", menu = reportsMenu)
-    reportsMenu.add_command(label="Reorder Notes", command = selectSupplierForOrderNotes)
-    reportsMenu.add_command(label="Receipts", command = selectOrderForReceipt)
-    reportsMenu.add_command(label="Profit Report", command = selectYearForProfitReport)
-    reportsMenu.add_command(label="Trucks In Stock", command = trucksInStock)
+    menuBar.add_cascade(label="Reports", menu=reportsMenu)
+    reportsMenu.add_command(label="Reorder Notes", command=selectSupplierForOrderNotes)
+    reportsMenu.add_command(label="Receipts", command=selectOrderForReceipt)
+    reportsMenu.add_command(label="Profit Report", command=selectYearForProfitReport)
+    reportsMenu.add_command(label="Trucks In Stock", command=trucksInStock)
 
     mainWindow.config(menu=menuBar)
     mainWindow.iconbitmap(os.path.join(assets, "tobys-trucks.ico"))
 
     if firstTime == True:    
-        canvasPicture = Canvas( mainWindow, width=1000, height=500)
-        canvasPicture.place( x=65, y=5)
-        canvasPicture.create_image(370, 240, image = tobysTrucksPicture)
+        canvasPicture = Canvas(mainWindow, width=1000, height=500)
+        canvasPicture.place(x=65, y=5)
+        canvasPicture.create_image(370, 240, image=tobysTrucksPicture)
 
     firstTime = False
 
@@ -243,8 +247,8 @@ def listTrucks():
     mainWindow.title("Toby's Trucks - Truck List")
 
     listTrucks = Listbox(mainWindow, width=80, height=20, font=("Consolas",14), selectmode="single")
-    listTrucks.place( x=30, y=15)
-    listTrucks.config( bg="Light blue", highlightbackground="blue", highlightthickness=2)
+    listTrucks.place(x=30, y=15)
+    listTrucks.config(bg="Light blue", highlightbackground="blue", highlightthickness=2)
 
     listTrucks.bind("<<ListboxSelect>>", editTruck)
 
@@ -264,8 +268,8 @@ def listTrucks():
 #----------------------------------------------------------------------------------------------------------
 
 def editTruck(event):
-    listIndex = event.widget.curselection()[0] # Find index number of the item clicked in the list      
-    selectedTruckID.set( event.widget.get(listIndex)[1:5] ) # Find the clicked truckID
+    listIndex = event.widget.curselection()[0]
+    selectedTruckID.set(event.widget.get(listIndex)[1:5])
     queryResults = tobysTrucksDatabase.execute(f"SELECT * FROM truckTable WHERE truckID = '{selectedTruckID.get()}'")
     truckRecord = queryResults.fetchone()
 
@@ -392,7 +396,6 @@ def setUpTruckForm(heading):
 
 def selectTruckToDelete():
     clearMainWindow()
-
     mainWindow.title("TOBY'S TRUCKS - DELETE A TRUCK")
 
     enterTruckIDFrame = Frame(mainWindow, bg="Light blue", highlightbackground="blue", highlightthickness=2)
@@ -1373,6 +1376,70 @@ def trucksInStock():
     listReport.insert( END, " =====================================================================")
     listReport.insert( END, " Total Trucks in stock :         " + str(totalStock) )
     listReport.insert( END, " =====================================================================")
+
+# =======================================================================================================
+#### CUSTOM SQL QUERY ####
+
+def setupCustomQuery():
+    clearMainWindow()
+    mainWindow.title("TOBY'S TRUCKS - CUSTOM SQL QUERY")
+
+    labelEnterSQL = Label(mainWindow, text="Enter SQL Query : ", font=('Arial', 10))
+    labelEnterSQL.place(x=100, y=8, width=120, height=40)
+
+    entrySQLQuery = Entry(mainWindow, textvariable=customSQLQueryString, width=75, bg="light blue")
+    entrySQLQuery.place(x=220, y=17)
+    entrySQLQuery.delete(0, END)
+
+    buttonRunSQL = Button(mainWindow, text="Run SQL Query", width=20, bg="light green", command=runCustomQuery)
+    buttonRunSQL.place(x=700, y=15)
+
+
+def runCustomQuery():
+    mainWindow.title("TOBY'S TRUCKS - CUSTOM SQL QUERY RESULTS")
+
+    listReport = Listbox(mainWindow, width=100, height=25, font=("Consolas",10))
+    listReport.place(x=30, y=55)
+    listReport.config(bg="Light blue", highlightbackground="blue", highlightthickness=2)
+
+    try:
+        queryResults = tobysTrucksDatabase.execute(customSQLQueryString.get())
+        allQueryResults = queryResults.fetchall()
+
+        if len(allQueryResults) >= 1:
+
+            listReport.destroy()
+            resultText = scrolledtext.ScrolledText(mainWindow, width=100, height=25, font=("Consolas", 10), wrap="word")
+            resultText.place(x=30, y=55)
+            resultText.config(bg="Light blue", highlightbackground="blue", highlightthickness=2)
+
+            resultText.insert(END, str(allQueryResults))
+            resultText.config(state="disabled")
+
+            def copy_data():
+                mainWindow.clipboard_clear()
+                mainWindow.clipboard_append(resultText.get("0.0", "end").strip())
+
+            def save_data_to_file():
+                file_path = filedialog.asksaveasfilename(defaultextension=".txt", filetypes=[("Text files", "*.txt")])
+                if file_path:
+                    with open(file_path, 'w') as file:
+                        file.write(resultText.get("0.0", "end").strip())
+                    messagebox.showinfo("Save Successful", f"Data saved to {file_path}.")
+
+            copyButton = Button(mainWindow, text="Copy Data to Clipboard", command=copy_data, bg="light green")
+            copyButton.place(x=720, y=415, width=130, height=30)
+
+            saveButton = Button(mainWindow, text="Save Data to File", command=save_data_to_file, bg="light green")
+            saveButton.place(x=720, y=455, width=130, height=30)
+
+        else:
+            listReport.insert(END, " No Records Found ")
+
+    except Exception as e:
+        messageLabel = Label(mainWindow, font="11", bg="red", text="Error in SQL Query: " + str(e))
+        messageLabel.place(x=320, y=360)
+
 
 #=========================================================================================================
 #### CALL THE MAIN FUNCTION ####
