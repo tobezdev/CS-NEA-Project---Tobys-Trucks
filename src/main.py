@@ -1421,7 +1421,12 @@ def runCustomQuery():
                 mainWindow.clipboard_append(resultText.get("0.0", "end").strip())
 
             def save_data_to_file():
-                file_path = filedialog.asksaveasfilename(defaultextension=".txt", filetypes=[("Text files", "*.txt")])
+                file_path = filedialog.asksaveasfilename(defaultextension=".txt", filetypes=[
+                    ("Text files", "*.txt"), 
+                    ("Javascript Object Notation (JSON)", "*.json"), 
+                    ("Binary Archive", "*.bin"),
+                    ("All files", "*.*")
+                ])
                 if file_path:
                     with open(file_path, 'w') as file:
                         file.write(resultText.get("0.0", "end").strip())
