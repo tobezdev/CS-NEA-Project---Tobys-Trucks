@@ -1431,6 +1431,8 @@ def runCustomQuery():
                     with open(file_path, 'w') as file:
                         file.write(resultText.get("0.0", "end").strip())
                     messagebox.showinfo("Save Successful", f"Data saved to {file_path}.")
+                else:
+                    messagebox.showwarning("Save Cancelled", "The filepath you selected did not exist or could not be created. Please try again later.")
 
             copyButton = Button(mainWindow, text="Copy Data to Clipboard", command=copy_data, bg="light green")
             copyButton.place(x=720, y=415, width=130, height=30)
