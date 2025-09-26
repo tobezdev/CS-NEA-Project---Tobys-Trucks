@@ -268,7 +268,6 @@ def main():
 #### LOGIN SCREEN ####
 
 def showLoginScreen():
-    """Display the login screen"""
     clearMainWindow()
     mainWindow.title("TOBY'S TRUCKS - LOGIN")
     
@@ -293,21 +292,17 @@ def showLoginScreen():
     exitButton = Button(mainWindow, text="Exit", width=15, command=exitProgram)
     exitButton.place(x=430, y=310)
     
-    # Set focus to username entry and bind Enter key
     usernameEntry.focus()
     passwordEntry.bind("<Return>", lambda event: processLogin())
     
-    # Clear login fields
     loginUsername.set("")
     loginPassword.set("")
 
 def logoutAndShowLogin():
-    """Logout current user and return to login screen"""
     logoutUser()
     showLoginScreen()
 
 def processLogin():
-    """Process login attempt"""
     username = loginUsername.get().strip()
     password = loginPassword.get().strip()
     
