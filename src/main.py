@@ -21,8 +21,11 @@ Toby Smith
 #### IMPORTS ####
 import os
 import sqlite3
-from datetime import date
+import hashlib
+import secrets
+from datetime import date, datetime
 from tkinter import Tk, PhotoImage, StringVar, Menu, Listbox, Button, Label, Entry, Frame, ttk, messagebox, Canvas, END, LEFT, filedialog
+from functools import wraps
 
 root = os.path.dirname(os.path.dirname(__file__))
 src = os.path.join(root, 'src')
@@ -32,6 +35,9 @@ assets = os.path.join(src, 'assets')
 #### DATABASE SETUP ####
 
 tobysTrucksDatabase = sqlite3.connect("data.db")
+
+def hashPassword(password, salt):
+    return hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt.encode('utf-8'), 100000).hex()
 
 try:
     tobysTrucksDatabase.execute("""
@@ -81,7 +87,42 @@ try:
             quantity INTEGER
         )
     """)
+    tobysTrucksDatabase.execute("""
+        CREATE TABLE IF NOT EXISTS userTable (
+            userID TEXT PRIMARY KEY,
+            username TEXT UNIQUE,
+            passwordHash TEXT,
+            salt TEXT,
+            role TEXT,
+            createdDate TEXT,
+            isActive TEXT
+        )
+    """)
+    tobysTrucksDatabase.execute("""
+        CREATE TABLE IF NOT EXISTS logsTable (
+            logID INTEGER PRIMARY KEY AUTOINCREMENT,
+            userID TEXT,
+            username TEXT,
+            action TEXT,
+            tableName TEXT,
+            recordID TEXT,
+            timestamp TEXT,
+            details TEXT
+        )
+    """)
     tobysTrucksDatabase.commit()
+
+    # Create default admin user if no users exist
+    userCount = tobysTrucksDatabase.execute("SELECT COUNT(*) FROM userTable").fetchone()[0]
+    if userCount == 0:
+        adminSalt = secrets.token_hex(32)
+        adminPasswordHash = hashPassword("admin123", adminSalt)
+        defaultAdmin = [
+            "ADM001", "admin", adminPasswordHash, adminSalt, 
+            "Administrator", date.today().strftime('%d/%m/%Y'), "Y"
+        ]
+        tobysTrucksDatabase.execute("INSERT INTO userTable VALUES (?,?,?,?,?,?,?)", defaultAdmin)
+        tobysTrucksDatabase.commit()
 
 except sqlite3.Error as e:
     print(f"Cannot setup database: {e}")
@@ -103,6 +144,74 @@ streamHandler.setFormatter(formatter)
 
 logger.addHandler(streamHandler)
 
+
+#----------------------------------------------------------------------------------------------------------
+#### AUTHENTICATION SYSTEM ####
+
+currentUser = None
+currentUserID = None
+currentUsername = None
+isLoggedIn = False
+
+def verifyPassword(password, salt, storedHash):
+    return hashPassword(password, salt) == storedHash
+
+def logUserAction(action, tableName="", recordID="", details=""):
+    if currentUserID and currentUsername:
+        timestamp = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
+        logRecord = [currentUserID, currentUsername, action, tableName, recordID, timestamp, details]
+        tobysTrucksDatabase.execute("""
+            INSERT INTO logsTable (userID, username, action, tableName, recordID, timestamp, details) 
+            VALUES (?,?,?,?,?,?,?)
+        """, logRecord)
+        tobysTrucksDatabase.commit()
+
+def requireLogin(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        if not isLoggedIn:
+            messagebox.showerror("Authentication Required", "You must be logged in to perform this action.")
+            showLoginScreen()
+            return
+        return func(*args, **kwargs)
+    return wrapper
+
+def authenticateUser(username, password):
+    global currentUser, currentUserID, currentUsername, isLoggedIn
+    
+    try:
+        queryResult = tobysTrucksDatabase.execute("""
+            SELECT userID, username, passwordHash, salt, role, isActive 
+            FROM userTable 
+            WHERE username = ? AND isActive = 'Y'
+        """, (username,)).fetchone()
+        
+        if queryResult and verifyPassword(password, queryResult[3], queryResult[2]):
+            currentUserID = queryResult[0]
+            currentUsername = queryResult[1]
+            currentUser = {
+                'userID': queryResult[0],
+                'username': queryResult[1],
+                'role': queryResult[4]
+            }
+            isLoggedIn = True
+            logUserAction("LOGIN", details=f"User {username} logged in")
+            return True
+        return False
+    except Exception as e:
+        messagebox.showerror("Authentication Error", f"Login failed: {str(e)}")
+        return False
+
+def logoutUser():
+    global currentUser, currentUserID, currentUsername, isLoggedIn
+    
+    if isLoggedIn:
+        logUserAction("LOGOUT", details=f"User {currentUsername} logged out")
+    
+    currentUser = None
+    currentUserID = None
+    currentUsername = None
+    isLoggedIn = False
 
 #----------------------------------------------------------------------------------------------------------
 #### TKINTER SETUP ####
@@ -143,6 +252,8 @@ selectedCustomerID = StringVar()
 selectedOrderID = StringVar()
 yearForProfitReport = StringVar()
 customSQLQueryString = StringVar()
+loginUsername = StringVar()
+loginPassword = StringVar()
 
 firstTime = True
 
@@ -150,8 +261,66 @@ firstTime = True
 #### THE MAIN FUNCTION ####
 
 def main():
-    setUpMainWindow()
+    showLoginScreen()
     mainWindow.mainloop()
+
+#----------------------------------------------------------------------------------------------------------
+#### LOGIN SCREEN ####
+
+def showLoginScreen():
+    """Display the login screen"""
+    clearMainWindow()
+    mainWindow.title("TOBY'S TRUCKS - LOGIN")
+    
+    loginFrame = Frame(mainWindow, bg="Light blue", highlightbackground="red", highlightthickness=2)
+    loginFrame.place(x=300, y=150, width=400, height=250)
+    
+    loginHeading = Label(mainWindow, text="LOGIN TO TOBY'S TRUCKS", font=('Arial', 16), bg="Light blue")
+    loginHeading.place(x=330, y=160, width=340, height=30)
+    
+    Label(mainWindow, bg="Light blue", text="Username:").place(x=320, y=210)
+    Label(mainWindow, bg="Light blue", text="Password:").place(x=320, y=240)
+    
+    usernameEntry = Entry(mainWindow, textvariable=loginUsername, width=25, bg="white")
+    usernameEntry.place(x=400, y=210)
+    
+    passwordEntry = Entry(mainWindow, textvariable=loginPassword, width=25, bg="white", show="*")
+    passwordEntry.place(x=400, y=240)
+    
+    loginButton = Button(mainWindow, text="Login", width=15, command=processLogin)
+    loginButton.place(x=430, y=280)
+    
+    exitButton = Button(mainWindow, text="Exit", width=15, command=exitProgram)
+    exitButton.place(x=430, y=310)
+    
+    # Set focus to username entry and bind Enter key
+    usernameEntry.focus()
+    passwordEntry.bind("<Return>", lambda event: processLogin())
+    
+    # Clear login fields
+    loginUsername.set("")
+    loginPassword.set("")
+
+def logoutAndShowLogin():
+    """Logout current user and return to login screen"""
+    logoutUser()
+    showLoginScreen()
+
+def processLogin():
+    """Process login attempt"""
+    username = loginUsername.get().strip()
+    password = loginPassword.get().strip()
+    
+    if not username or not password:
+        messagebox.showerror("Login Error", "Please enter both username and password.")
+        return
+    
+    if authenticateUser(username, password):
+        messagebox.showinfo("Login Successful", f"Welcome, {currentUsername}!")
+        setUpMainWindow()
+    else:
+        messagebox.showerror("Login Failed", "Invalid username or password.")
+        loginPassword.set("")  # Clear password field
 
 #----------------------------------------------------------------------------------------------------------
 
@@ -160,7 +329,7 @@ def setUpMainWindow():
 
     mainWindow.geometry("870x525")
     mainWindow.title("TOBY\'S TRUCKS")
-    mainWindow.resizable(False, False)
+    mainWindow.resizable(True, True)
 
     menuBar = Menu(mainWindow)
 
@@ -169,6 +338,10 @@ def setUpMainWindow():
     fileMenu.add_command(label="Exit", command=exitProgram)
     fileMenu.add_command(label="Return to Main Menu", command=clearMainWindow)
     fileMenu.add_command(label="Run Custom SQL Query", command=setupCustomQuery)
+    fileMenu.add_separator()
+    fileMenu.add_command(label="See System Logs", command=displaySystemLogs)
+    fileMenu.add_separator()
+    fileMenu.add_command(label="Logout", command=logoutAndShowLogin)
 
     trucksMenu = Menu(menuBar, tearoff=0)
     menuBar.add_cascade(label="Trucks", menu=trucksMenu)
@@ -220,6 +393,12 @@ def setUpMainWindow():
         canvasPicture.place(x=65, y=5)
         canvasPicture.create_image(370, 240, image=tobysTrucksPicture)
 
+    # Display logged in user status
+    if isLoggedIn and currentUsername:
+        statusLabel = Label(mainWindow, text=f"Logged in as: {currentUsername}", 
+                          font=('Arial', 10), bg="light green")
+        statusLabel.place(x=10, y=500)
+
     firstTime = False
 
 #----------------------------------------------------------------------------------------------------------
@@ -267,6 +446,7 @@ def listTrucks():
 
 #----------------------------------------------------------------------------------------------------------
 
+@requireLogin
 def editTruck(event):
     listIndex = event.widget.curselection()[0]
     selectedTruckID.set(event.widget.get(listIndex)[1:5])
@@ -309,13 +489,17 @@ def updateTruckDetails():
             truckID = {selectedTruckID.get()}
     """)
     tobysTrucksDatabase.commit()
+    
+    logUserAction("UPDATE", "truckTable", selectedTruckID.get(), f"Updated truck: {selectedTruckID.get()}")
 
     labelMessage = Label(mainWindow, font="11", bg="Light blue", text="Truck Details Updated")
     labelMessage.place(x=345, y=360)
 
 #----------------------------------------------------------------------------------------------------------
 
+@requireLogin
 def addTruck():
+    logUserAction("ACCESS", "truckTable", "", "Accessed Add Truck form")
     truckID.set("")
     make.set("")
     model.set("")
@@ -343,6 +527,8 @@ def saveNewTruck():
 
     tobysTrucksDatabase.execute("INSERT INTO truckTable VALUES (?,?,?,?,?,?,?,?,?,?)", newTruckRecord)
     tobysTrucksDatabase.commit()
+    
+    logUserAction("INSERT", "truckTable", truckID.get(), f"Added new truck: {truckID.get()}")
 
     messageLabel = Label(mainWindow, font="11", bg="Light blue", text="New Truck Saved")
     messageLabel.place(x=350, y=360)
@@ -394,6 +580,7 @@ def setUpTruckForm(heading):
 
 #----------------------------------------------------------------------------------------------------------
 
+@requireLogin
 def selectTruckToDelete():
     clearMainWindow()
     mainWindow.title("TOBY'S TRUCKS - DELETE A TRUCK")
@@ -416,9 +603,12 @@ def selectTruckToDelete():
 
 #----------------------------------------------------------------------------------------------------------
 
+@requireLogin
 def deleteTruck():
     tobysTrucksDatabase.execute(f"DELETE FROM truckTable WHERE truckID = '{truckID.get()}'")
     tobysTrucksDatabase.commit()
+    
+    logUserAction("DELETE", "truckTable", truckID.get(), f"Deleted truck: {truckID.get()}")
 
     frameMessage = Frame(mainWindow, bg="Light blue", highlightbackground="blue", highlightthickness=2)
     frameMessage.place(x=90, y=160, width=200, height=100)
@@ -454,6 +644,7 @@ def listSuppliers():
 
 #----------------------------------------------------------------------------------------------------------
 
+@requireLogin
 def editSupplier(event):
     listIndex = event.widget.curselection()[0]
     selectedSupplierID.set(event.widget.get(listIndex)[1:9])
@@ -487,13 +678,17 @@ def updateSupplierDetails():
             supplierID = '{selectedSupplierID.get()}'
     """)
     tobysTrucksDatabase.commit()
+    
+    logUserAction("UPDATE", "supplierTable", selectedSupplierID.get(), f"Updated supplier: {selectedSupplierID.get()}")
 
     messageLabel = Label(mainWindow, font="11", bg="Light blue", text="Supplier Updated")
     messageLabel.place(x=345, y=360)
 
 #----------------------------------------------------------------------------------------------------------
 
+@requireLogin
 def addSupplier():
+    logUserAction("ACCESS", "supplierTable", "", "Accessed Add Supplier form")
     supplierID.set("")
     supplierName.set("")
     supplierAddress.set("")
@@ -515,6 +710,8 @@ def saveNewSupplier():
 
     tobysTrucksDatabase.execute("INSERT INTO supplierTable VALUES (?,?,?,?,?)", newSupplierRecord)
     tobysTrucksDatabase.commit()
+    
+    logUserAction("INSERT", "supplierTable", supplierID.get(), f"Added new supplier: {supplierID.get()}")
 
     messageLabel = Label(mainWindow, font="11", bg="Light blue", text="New Supplier Saved")
     messageLabel.place(x=350, y=360)
@@ -553,6 +750,7 @@ def setUpSupplierForm(heading):
 
 #----------------------------------------------------------------------------------------------------------
 
+@requireLogin
 def selectSupplierToDelete():
     clearMainWindow()
 
@@ -576,9 +774,12 @@ def selectSupplierToDelete():
 
 #---------------------------------------------------------------------------------------
 
+@requireLogin
 def deleteSupplier():
     tobysTrucksDatabase.execute(f"DELETE FROM supplierTable WHERE supplierID = '{supplierID.get()}'")
     tobysTrucksDatabase.commit()
+    
+    logUserAction("DELETE", "supplierTable", supplierID.get(), f"Deleted supplier: {supplierID.get()}")
 
     messageFrame = Frame(mainWindow, bg="Light blue", highlightbackground="blue", highlightthickness=2)
     messageFrame.place(x=90, y=160, width=200, height=100)
@@ -613,6 +814,7 @@ def listCustomers():
 
 #----------------------------------------------------------------------------------------------------------
 
+@requireLogin
 def editCustomer(event):
     listIndex = event.widget.curselection()[0]
     selectedCustomerID.set( event.widget.get(listIndex)[1:5])
@@ -646,13 +848,17 @@ def updateCustomerDetails():
             customerID = '{selectedCustomerID.get()}'
     """)
     tobysTrucksDatabase.commit()
+    
+    logUserAction("UPDATE", "customerTable", selectedCustomerID.get(), f"Updated customer: {selectedCustomerID.get()}")
 
     messageLabel = Label(mainWindow, font="11", bg="Light blue", text="Customer Updated")
     messageLabel.place(x=345, y=360)
 
 #----------------------------------------------------------------------------------------------------------
 
+@requireLogin
 def addCustomer():
+    logUserAction("ACCESS", "customerTable", "", "Accessed Add Customer form")
     customerID.set("")
     customerName.set("")
     customerAddress.set("")
@@ -675,6 +881,8 @@ def saveNewCustomer():
 
     tobysTrucksDatabase.execute("INSERT INTO customerTable VALUES(?,?,?,?,?)", newCustomerRecord)
     tobysTrucksDatabase.commit()
+    
+    logUserAction("INSERT", "customerTable", customerID.get(), f"Added new customer: {customerID.get()}")
 
     messageLabel = Label(mainWindow, font="11", bg="Light blue", text="New Customer Saved")
     messageLabel.place(x=320, y=360)
@@ -710,6 +918,7 @@ def setUpCustomerForm(heading):
 
 #----------------------------------------------------------------------------------------------------------
 
+@requireLogin
 def selectCustomerToDelete():
     clearMainWindow()
 
@@ -733,9 +942,12 @@ def selectCustomerToDelete():
 
 #----------------------------------------------------------------------------------------------------------
 
+@requireLogin
 def deleteCustomer():
     tobysTrucksDatabase.execute("DELETE FROM customerTable WHERE customerID = ?", (customerID.get(),))
     tobysTrucksDatabase.commit()
+    
+    logUserAction("DELETE", "customerTable", customerID.get(), f"Deleted customer: {customerID.get()}")
 
     messageFrame = Frame(mainWindow, bg="Light blue", highlightbackground="blue", highlightthickness=2)
     messageFrame.place(x=90, y=160, width=200, height=100)
@@ -771,6 +983,7 @@ def listOrders():
 
 #----------------------------------------------------------------------------------------------------------
 
+@requireLogin
 def editOrder(event):
 
     listIndex = event.widget.curselection()[0]
@@ -803,13 +1016,17 @@ def updateOrderDetails():
             orderID = '{selectedOrderID.get()}'
     """)
     tobysTrucksDatabase.commit()
+    
+    logUserAction("UPDATE", "orderTable", selectedOrderID.get(), f"Updated order: {selectedOrderID.get()}")
 
     messageLabel = Label(mainWindow, font="11", bg="Light blue", text="Order Updated")
     messageLabel.place(x=345, y=360)
 
 #----------------------------------------------------------------------------------------------------------
 
+@requireLogin
 def addOrder():
+    logUserAction("ACCESS", "orderTable", "", "Accessed Add Order form")
     orderID.set("")
     orderCustomerID.set("")
     orderDate.set("")
@@ -827,6 +1044,8 @@ def saveNewOrder():
 
     tobysTrucksDatabase.execute("INSERT INTO orderTable VALUES(?,?,?,?)",newOrderRecord)
     tobysTrucksDatabase.commit()
+    
+    logUserAction("INSERT", "orderTable", orderID.get(), f"Added new order: {orderID.get()}")
 
     messageLabel = Label(mainWindow, font="11", bg="Light blue", text="New Order Saved")
     messageLabel.place(x=320, y=360)
@@ -860,6 +1079,7 @@ def setUpOrderForm(heading):
 
 #----------------------------------------------------------------------------------------------------------
 
+@requireLogin
 def selectOrderToDelete():
     clearMainWindow()
     
@@ -883,9 +1103,12 @@ def selectOrderToDelete():
 
 #----------------------------------------------------------------------------------------------------------
 
+@requireLogin
 def deleteOrder():
     tobysTrucksDatabase.execute(f"DELETE FROM orderTable WHERE orderID = '{orderID.get()}'")
     tobysTrucksDatabase.commit()
+    
+    logUserAction("DELETE", "orderTable", orderID.get(), f"Deleted order: {orderID.get()}")
 
     messageFrame = Frame(mainWindow, bg="Light blue", highlightbackground="blue", highlightthickness=2)
     messageFrame.place(x=90, y=160, width=200, height=100)
@@ -921,6 +1144,7 @@ def listOrderItems():
 
 #----------------------------------------------------------------------------------------------------------
 
+@requireLogin
 def editOrderItem(event):
     listIndex = event.widget.curselection()[0]
 
@@ -957,13 +1181,17 @@ def updateOrderItemDetails():
         AND orderItemsTruckID = '{selectedTruckID.get()}'
     """)
     tobysTrucksDatabase.commit()
+    
+    logUserAction("UPDATE", "orderItemsTable", f"{selectedOrderID.get()}-{selectedTruckID.get()}", f"Updated order item: Order {selectedOrderID.get()}, Truck {selectedTruckID.get()}")
 
     messageLabel = Label(mainWindow, font="11", bg="Light blue", text="Order Items Updated")
     messageLabel.place(x=335, y=360)
 
 #----------------------------------------------------------------------------------------------------------
 
+@requireLogin
 def addOrderItem():
+    logUserAction("ACCESS", "orderItemsTable", "", "Accessed Add Order Item form")
     orderItemsOrderID.set("")
     orderItemsTruckID.set("")
     quantity.set("")
@@ -980,6 +1208,8 @@ def saveNewOrderItem():
 
     tobysTrucksDatabase.execute("INSERT INTO orderItemsTable VALUES(?,?,?)", newOrderItemsRecord)
     tobysTrucksDatabase.commit()
+    
+    logUserAction("INSERT", "orderItemsTable", f"{orderItemsOrderID.get()}-{orderItemsTruckID.get()}", f"Added order item: Order {orderItemsOrderID.get()}, Truck {orderItemsTruckID.get()}")
 
     messageLabel = Label(mainWindow, font="11", bg="Light blue", text="New Order Item Saved")
     messageLabel.place(x=320, y=360)
@@ -1011,6 +1241,7 @@ def setUpOrderItemsForm(heading):
 
 #----------------------------------------------------------------------------------------------------------
 
+@requireLogin
 def selectOrderItemToDelete():
     clearMainWindow()
     mainWindow.title("TOBY'S TRUCKS - DELETE A ORDER ITEM")
@@ -1040,9 +1271,12 @@ def selectOrderItemToDelete():
 
 #----------------------------------------------------------------------------------------------------------
 
+@requireLogin
 def deleteOrderItem():
     tobysTrucksDatabase.execute(f"DELETE FROM orderItemsTable WHERE orderItemsOrderID = '{orderItemsOrderID.get()}' AND orderItemsTruckID = '{orderItemsTruckID.get()}'")
     tobysTrucksDatabase.commit()
+    
+    logUserAction("DELETE", "orderItemsTable", f"{orderItemsOrderID.get()}-{orderItemsTruckID.get()}", f"Deleted order item: Order {orderItemsOrderID.get()}, Truck {orderItemsTruckID.get()}")
 
     messageFrame = Frame(mainWindow, bg="Light blue", highlightbackground="blue", highlightthickness=2)
     messageFrame.place(x=90, y=160, width=200, height=100)
@@ -1050,6 +1284,39 @@ def deleteOrderItem():
     messageLabel = Label(mainWindow, font="12", bg="Light blue", text="Order Item Deleted", justify=LEFT)
     messageLabel.place(x=92, y=162)
     
+#==========================================================================================================
+############ SYSTEM LOGS ############
+
+def displaySystemLogs():
+    """Display system activity logs"""
+    clearMainWindow()
+    mainWindow.title("TOBY'S TRUCKS - SYSTEM LOGS")
+
+    logsList = Listbox(mainWindow, width=120, height=25, font=("Consolas", 9), selectmode="single")
+    logsList.place(x=30, y=15)
+    logsList.config(bg="Light blue", highlightbackground="blue", highlightthickness=2)
+
+    logsList.insert(END, " ")
+    logsList.insert(END, "                               TOBY'S TRUCKS - SYSTEM ACTIVITY LOGS")
+    logsList.insert(END, "                               ===================================")
+    logsList.insert(END, " ")
+    logsList.insert(END, " Log ID  User ID   Username     Action      Table       Record ID   Timestamp           Details")
+    logsList.insert(END, " ------- --------- ------------ ----------- ----------- ----------- ------------------- ---------------------------------")
+
+    queryResults = tobysTrucksDatabase.execute("""
+        SELECT logID, userID, username, action, tableName, recordID, timestamp, details
+        FROM logsTable
+        ORDER BY logID DESC
+    """)
+
+    for row in queryResults:
+        logLine = " %-7s %-9s %-12s %-11s %-11s %-11s %-19s %s" % (
+            str(row[0]), str(row[1] or ""), str(row[2] or ""), 
+            str(row[3] or ""), str(row[4] or ""), str(row[5] or ""), 
+            str(row[6] or ""), str(row[7] or "")
+        )
+        logsList.insert(END, logLine)
+
 #==========================================================================================================
 ############ REPORTS ############
 
