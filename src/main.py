@@ -23,6 +23,7 @@ import os
 import sqlite3
 from datetime import date
 from tkinter import Tk, PhotoImage, StringVar, Menu, Listbox, Button, Label, Entry, Frame, ttk, messagebox, Canvas, END, LEFT, filedialog
+from werkzeug.security import generate_password_hash, check_password_hash
 
 root = os.path.dirname(os.path.dirname(__file__))
 src = os.path.join(root, 'src')
@@ -32,6 +33,7 @@ assets = os.path.join(src, 'assets')
 #### DATABASE SETUP ####
 
 tobysTrucksDatabase = sqlite3.connect("data.db")
+usersDatabase = sqlite3.connect("users.db")
 
 try:
     tobysTrucksDatabase.execute("""
@@ -85,6 +87,152 @@ try:
 
 except sqlite3.Error as e:
     print(f"Cannot setup database: {e}")
+
+#----------------------------------------------------------------------------------------------------------
+#### USERS DATABASE SETUP ####
+
+try:
+    usersDatabase.execute("""
+        CREATE TABLE IF NOT EXISTS userTable (
+            username TEXT PRIMARY KEY,
+            password_hash TEXT,
+            email TEXT,
+            created_date TEXT
+        )
+    """)
+    
+    # Check if demo accounts already exist
+    existing_users = usersDatabase.execute("SELECT COUNT(*) FROM userTable").fetchone()[0]
+    
+    if existing_users == 0:
+        # Add demo accounts
+        demo_accounts = [
+            ("admin", generate_password_hash("admin123"), "admin@tobeystrucks.com", str(date.today())),
+            ("manager", generate_password_hash("manager123"), "manager@tobeystrucks.com", str(date.today())),
+            ("employee", generate_password_hash("employee123"), "employee@tobeystrucks.com", str(date.today()))
+        ]
+        
+        usersDatabase.executemany("INSERT INTO userTable VALUES (?,?,?,?)", demo_accounts)
+        logger.info("Demo user accounts created")
+    
+    usersDatabase.commit()
+
+except sqlite3.Error as e:
+    print(f"Cannot setup users database: {e}")
+
+#----------------------------------------------------------------------------------------------------------
+#### AUTHENTICATION FUNCTIONS ####
+
+# Global variable to track login status
+current_user = None
+
+def hash_password(password):
+    """Generate a password hash using werkzeug.security"""
+    return generate_password_hash(password)
+
+def verify_password(password, password_hash):
+    """Verify a password against its hash using werkzeug.security"""
+    return check_password_hash(password_hash, password)
+
+def authenticate_user(username, password):
+    """Authenticate user credentials against the users database"""
+    try:
+        user_record = usersDatabase.execute(
+            "SELECT username, password_hash FROM userTable WHERE username = ?", 
+            (username,)
+        ).fetchone()
+        
+        if user_record and verify_password(password, user_record[1]):
+            global current_user
+            current_user = user_record[0]
+            logger.info(f"User {username} authenticated successfully")
+            return True
+        else:
+            logger.warning(f"Failed authentication attempt for user {username}")
+            return False
+    except sqlite3.Error as e:
+        logger.error(f"Database error during authentication: {e}")
+        return False
+
+def logout_user():
+    """Logout the current user"""
+    global current_user
+    if current_user:
+        logger.info(f"User {current_user} logged out")
+        current_user = None
+
+def require_login(func):
+    """Decorator function that requires login before accessing a feature"""
+    def wrapper(*args, **kwargs):
+        if current_user is None:
+            show_login_dialog()
+            # Only proceed if login was successful
+            if current_user is None:
+                return
+        return func(*args, **kwargs)
+    return wrapper
+
+def show_login_dialog():
+    """Show login dialog and handle authentication"""
+    login_window = Tk()
+    login_window.title("Login - Toby's Trucks")
+    login_window.geometry("350x200")
+    login_window.resizable(False, False)
+    
+    # Center the login window
+    login_window.transient(mainWindow)
+    login_window.grab_set()
+    
+    username_var = StringVar()
+    password_var = StringVar()
+    
+    Label(login_window, text="Username:", font=('Arial', 12)).place(x=50, y=40)
+    username_entry = Entry(login_window, textvariable=username_var, width=20, font=('Arial', 12))
+    username_entry.place(x=140, y=40)
+    username_entry.focus()
+    
+    Label(login_window, text="Password:", font=('Arial', 12)).place(x=50, y=80)
+    password_entry = Entry(login_window, textvariable=password_var, width=20, font=('Arial', 12), show="*")
+    password_entry.place(x=140, y=80)
+    
+    def attempt_login():
+        username = username_var.get().strip()
+        password = password_var.get().strip()
+        
+        if not username or not password:
+            messagebox.showerror("Error", "Please enter both username and password")
+            return
+            
+        if authenticate_user(username, password):
+            messagebox.showinfo("Success", f"Welcome {username}!")
+            login_window.destroy()
+        else:
+            messagebox.showerror("Error", "Invalid username or password")
+            password_entry.delete(0, END)
+            username_entry.focus()
+    
+    def cancel_login():
+        login_window.destroy()
+    
+    Button(login_window, text="Login", command=attempt_login, bg="light green", width=10).place(x=140, y=120)
+    Button(login_window, text="Cancel", command=cancel_login, bg="light coral", width=10).place(x=230, y=120)
+    
+    # Info label for demo accounts
+    info_label = Label(login_window, text="Demo accounts: admin/admin123, manager/manager123, employee/employee123", 
+                      font=('Arial', 8), fg="gray")
+    info_label.place(x=20, y=160)
+    
+    # Bind Enter key to login
+    password_entry.bind('<Return>', lambda event: attempt_login())
+    username_entry.bind('<Return>', lambda event: password_entry.focus())
+    
+    login_window.mainloop()
+
+def handle_logout():
+    """Handle user logout and refresh main window"""
+    logout_user()
+    clearMainWindow()
+    messagebox.showinfo("Logout", "You have been logged out successfully.")
 
 #----------------------------------------------------------------------------------------------------------
 #### LOGGING SETUP ####
@@ -212,6 +360,16 @@ def setUpMainWindow():
     reportsMenu.add_command(label="Profit Report", command=selectYearForProfitReport)
     reportsMenu.add_command(label="Trucks In Stock", command=trucksInStock)
 
+    # User authentication menu
+    userMenu = Menu(menuBar, tearoff=0)
+    menuBar.add_cascade(label="User", menu=userMenu)
+    if current_user:
+        userMenu.add_command(label=f"Logged in as: {current_user}", state="disabled")
+        userMenu.add_separator()
+        userMenu.add_command(label="Logout", command=handle_logout)
+    else:
+        userMenu.add_command(label="Login", command=show_login_dialog)
+
     mainWindow.config(menu=menuBar)
     mainWindow.iconbitmap(os.path.join(assets, "tobys-trucks.ico"))
 
@@ -315,6 +473,7 @@ def updateTruckDetails():
 
 #----------------------------------------------------------------------------------------------------------
 
+@require_login
 def addTruck():
     truckID.set("")
     make.set("")
@@ -334,6 +493,7 @@ def addTruck():
 
 #----------------------------------------------------------------------------------------------------------
 
+@require_login
 def saveNewTruck():
     newTruckRecord = [
         truckID.get(), make.get(), model.get(), size.get(),
@@ -394,6 +554,7 @@ def setUpTruckForm(heading):
 
 #----------------------------------------------------------------------------------------------------------
 
+@require_login
 def selectTruckToDelete():
     clearMainWindow()
     mainWindow.title("TOBY'S TRUCKS - DELETE A TRUCK")
@@ -416,6 +577,7 @@ def selectTruckToDelete():
 
 #----------------------------------------------------------------------------------------------------------
 
+@require_login
 def deleteTruck():
     tobysTrucksDatabase.execute(f"DELETE FROM truckTable WHERE truckID = '{truckID.get()}'")
     tobysTrucksDatabase.commit()
@@ -493,6 +655,7 @@ def updateSupplierDetails():
 
 #----------------------------------------------------------------------------------------------------------
 
+@require_login
 def addSupplier():
     supplierID.set("")
     supplierName.set("")
@@ -652,6 +815,7 @@ def updateCustomerDetails():
 
 #----------------------------------------------------------------------------------------------------------
 
+@require_login
 def addCustomer():
     customerID.set("")
     customerName.set("")
